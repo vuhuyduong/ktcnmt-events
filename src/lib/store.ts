@@ -5,7 +5,6 @@ import {
   FEMALE_MEMBERS,
   MALE_MEMBERS,
   MaleTransportOptionId,
-  SPECIAL_GUEST_ID,
   STAFF_MEMBERS,
 } from "@/data/roster";
 
@@ -54,6 +53,15 @@ export interface BlindBoxSlot {
   assignedMaleId: string | null;
   assignedMaleName: string | null;
   openedAt: number | null;
+}
+
+export interface QueenParticipant {
+  id: string;
+  shortName: string;
+  fullName: string;
+  isGuest: boolean;
+  companionMaleId?: string;
+  companionMaleName?: string;
 }
 
 export interface GameState {
@@ -108,11 +116,40 @@ function shuffleArray<T>(items: T[]): T[] {
   return arr;
 }
 
-export function createInitialBoxes(): BlindBoxSlot[] {
+export function getDynamicQueens(state: AppStateData): QueenParticipant[] {
+  const staffQueens: QueenParticipant[] = FEMALE_MEMBERS.map((f) => ({
+    id: f.id,
+    shortName: f.shortName,
+    fullName: f.fullName,
+    isGuest: false,
+  }));
+
+  const guestQueens: QueenParticipant[] = [];
+  for (const male of MALE_MEMBERS) {
+    const rsvp = state.rsvps[male.id];
+    if (rsvp?.attending && rsvp?.hasPlusOne) {
+      const customName = rsvp.plusOneName?.trim();
+      const shortName = customName || `Bà xã ${male.shortName}`;
+      guestQueens.push({
+        id: `guest-${male.id}`,
+        shortName,
+        fullName: `${shortName} (Đi cùng ${male.shortName})`,
+        isGuest: true,
+        companionMaleId: male.id,
+        companionMaleName: male.shortName,
+      });
+    }
+  }
+
+  return [...staffQueens, ...guestQueens];
+}
+
+export function createInitialBoxes(boxCount = 7): BlindBoxSlot[] {
   const shuffledRewards = shuffleArray(BLIND_BOX_REWARDS);
-  return shuffledRewards.map((reward, index) => ({
+  const count = Math.max(5, Math.min(boxCount, BLIND_BOX_REWARDS.length));
+  return Array.from({ length: count }, (_, index) => ({
     boxNumber: index + 1,
-    rewardId: reward.id,
+    rewardId: shuffledRewards[index % shuffledRewards.length].id,
     isOpened: false,
     openedByQueenId: null,
     openedByQueenName: null,
@@ -122,7 +159,7 @@ export function createInitialBoxes(): BlindBoxSlot[] {
   }));
 }
 
-export function createDefaultGameState(): GameState {
+export function createDefaultGameState(boxCount = 7): GameState {
   return {
     isLive: false,
     focusTimestamp: 0,
@@ -131,24 +168,43 @@ export function createDefaultGameState(): GameState {
     currentQueenId: FEMALE_MEMBERS[0].id,
     activeBoxNumber: null,
     selectedMaleId: null,
-    boxes: createInitialBoxes(),
+    boxes: createInitialBoxes(boxCount),
     updatedAt: Date.now(),
   };
 }
 
 export function createDefaultState(): AppStateData {
   const nowIso = new Date().toISOString();
-  return {
-    rsvps: {
-      "huy-duong": {
-        memberId: "huy-duong",
-        attending: true,
-        hasPlusOne: false,
-        plusOneName: "",
-        transportOption: "vanguard",
-        updatedAt: nowIso,
-      },
+  const defaultRsvps: Record<string, MemberRsvp> = {
+    "huy-duong": {
+      memberId: "huy-duong",
+      attending: true,
+      hasPlusOne: false,
+      plusOneName: "",
+      transportOption: "vanguard",
+      updatedAt: nowIso,
     },
+    "anh-thai": {
+      memberId: "anh-thai",
+      attending: true,
+      hasPlusOne: true,
+      plusOneName: "Bà xã Anh Thái",
+      transportOption: "car",
+      updatedAt: nowIso,
+    },
+    "manh-cuong": {
+      memberId: "manh-cuong",
+      attending: true,
+      hasPlusOne: true,
+      plusOneName: "Bà xã Anh Cường",
+      transportOption: "grab",
+      updatedAt: nowIso,
+    },
+  };
+
+  // 5 female staff + 2 wives (Thái & Cường) = 7 boxes by default
+  return {
+    rsvps: defaultRsvps,
     milkTeaOrders: {},
     wishes: [
       {
@@ -156,30 +212,24 @@ export function createDefaultState(): AppStateData {
         authorId: "huy-duong",
         authorName: "Anh Dương",
         content:
-          "Chúc 05 bông hoa KTCNMT và chị khách quý dịp 20/10 luôn trẻ trung, rạng rỡ, ngập tràn niềm vui và có một đêm tiệc thật bùng nổ tại The Gangs! 🌸🥂",
+          "Chúc 05 bông hoa KTCNMT và các chị khách quý dịp 20/10 luôn trẻ trung, rạng rỡ, ngập tràn niềm vui và có một đêm tiệc thật bùng nổ tại The Street! 🌸🥂",
         likes: 8,
         createdAt: nowIso,
       },
     ],
-    gameState: createDefaultGameState(),
+    gameState: createDefaultGameState(7),
   };
 }
 
-export function getSpecialGuestName(state: AppStateData): string {
-  for (const rsvp of Object.values(state.rsvps)) {
-    if (rsvp.attending && rsvp.hasPlusOne && rsvp.plusOneName?.trim()) {
-      return rsvp.plusOneName.trim();
-    }
-  }
-  return "Khách Quý Đặc Biệt";
-}
-
-export function getQueenDisplayName(queenId: string, state: AppStateData): string {
-  if (queenId === SPECIAL_GUEST_ID) {
-    return getSpecialGuestName(state);
-  }
-  const found = STAFF_MEMBERS.find((m) => m.id === queenId);
-  return found ? found.shortName : "Nữ Hoàng KTCNMT";
+export function getQueenDisplayName(
+  queenId: string,
+  state: AppStateData
+): string {
+  const queens = getDynamicQueens(state);
+  const found = queens.find((q) => q.id === queenId);
+  if (found) return found.shortName;
+  const staff = STAFF_MEMBERS.find((m) => m.id === queenId);
+  return staff ? staff.shortName : "Nữ Hoàng KTCNMT";
 }
 
 function persistStateToDisk(state: AppStateData): void {
@@ -193,10 +243,88 @@ function persistStateToDisk(state: AppStateData): void {
   }
 }
 
+export function syncBoxesWithQueens(state: AppStateData): boolean {
+  const game = state.gameState;
+  const queens = getDynamicQueens(state);
+  const targetCount = Math.max(
+    FEMALE_MEMBERS.length,
+    Math.min(queens.length, BLIND_BOX_REWARDS.length)
+  );
+  let mutated = false;
+
+  // 1. Update display names on already-opened boxes if a guest's name changed
+  for (const box of game.boxes) {
+    if (box.openedByQueenId) {
+      const q = queens.find((item) => item.id === box.openedByQueenId);
+      if (q && box.openedByQueenName !== q.shortName) {
+        box.openedByQueenName = q.shortName;
+        mutated = true;
+      }
+    }
+  }
+
+  // 2. Grow boxes if more male members registered +1 guests
+  if (game.boxes.length < targetCount) {
+    const usedRewardIds = new Set(game.boxes.map((b) => b.rewardId));
+    const availableRewards = shuffleArray(
+      BLIND_BOX_REWARDS.filter((r) => !usedRewardIds.has(r.id))
+    );
+    while (game.boxes.length < targetCount) {
+      const nextNum = game.boxes.length + 1;
+      const nextReward =
+        availableRewards.pop() ||
+        BLIND_BOX_REWARDS[(nextNum - 1) % BLIND_BOX_REWARDS.length];
+      game.boxes.push({
+        boxNumber: nextNum,
+        rewardId: nextReward.id,
+        isOpened: false,
+        openedByQueenId: null,
+        openedByQueenName: null,
+        assignedMaleId: null,
+        assignedMaleName: null,
+        openedAt: null,
+      });
+      mutated = true;
+    }
+  }
+
+  // 3. Shrink unopened boxes if a male member turned off +1
+  if (game.boxes.length > targetCount) {
+    const removableCount = game.boxes.length - targetCount;
+    let removed = 0;
+    for (let i = game.boxes.length - 1; i >= 0 && removed < removableCount; i--) {
+      if (!game.boxes[i].isOpened && game.boxes[i].boxNumber !== game.activeBoxNumber) {
+        game.boxes.splice(i, 1);
+        removed++;
+        mutated = true;
+      }
+    }
+    if (removed > 0) {
+      game.boxes.forEach((b, idx) => {
+        b.boxNumber = idx + 1;
+      });
+    }
+  }
+
+  // 4. Ensure currentQueenId is valid
+  if (!queens.some((q) => q.id === game.currentQueenId)) {
+    const openedQueens = new Set(
+      game.boxes
+        .map((b) => b.openedByQueenId)
+        .filter((id): id is string => Boolean(id))
+    );
+    const nextUnopenedQueen = queens.find((q) => !openedQueens.has(q.id));
+    game.currentQueenId = (nextUnopenedQueen || queens[0]).id;
+    mutated = true;
+  }
+
+  return mutated;
+}
+
 export function syncGameTimers(state: AppStateData): boolean {
   const game = state.gameState;
   const now = Date.now();
-  let mutated = false;
+  let mutated = syncBoxesWithQueens(state);
 
   if (game.phase === "SHAKING" && now - game.phaseStartedAt >= 2000) {
     game.phase = "REVEALED";
@@ -208,15 +336,6 @@ export function syncGameTimers(state: AppStateData): boolean {
     game.phaseStartedAt = now;
     game.updatedAt = now;
     mutated = true;
-  }
-
-  // Keep opened box #6 guest name updated if special guest name changed
-  const guestName = getSpecialGuestName(state);
-  for (const box of game.boxes) {
-    if (box.openedByQueenId === SPECIAL_GUEST_ID && box.openedByQueenName !== guestName) {
-      box.openedByQueenName = guestName;
-      mutated = true;
-    }
   }
 
   if (mutated) {

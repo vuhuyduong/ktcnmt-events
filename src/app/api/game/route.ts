@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { FEMALE_MEMBERS, SPECIAL_GUEST_ID } from "@/data/roster";
+import { FEMALE_MEMBERS } from "@/data/roster";
 import {
   createInitialBoxes,
+  getDynamicQueens,
   getQueenDisplayName,
-  getSpecialGuestName,
   getState,
   pickRandomMaleForGame,
   updateState,
@@ -11,14 +11,12 @@ import {
 
 export const dynamic = "force-dynamic";
 
-const ALL_QUEEN_IDS = [...FEMALE_MEMBERS.map((f) => f.id), SPECIAL_GUEST_ID];
-
 export async function GET() {
   const state = getState();
   return NextResponse.json(
     {
       gameState: state.gameState,
-      specialGuestName: getSpecialGuestName(state),
+      queens: getDynamicQueens(state),
       rsvps: state.rsvps,
       serverTime: Date.now(),
     },
@@ -38,6 +36,8 @@ export async function POST(req: NextRequest) {
 
     const updated = updateState((draft) => {
       const game = draft.gameState;
+      const dynamicQueens = getDynamicQueens(draft);
+      const allQueenIds = dynamicQueens.map((q) => q.id);
 
       if (action === "START_LIVE") {
         game.isLive = true;
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
         game.updatedAt = now;
       } else if (action === "SET_QUEEN") {
         const { queenId } = body;
-        if (ALL_QUEEN_IDS.includes(queenId)) {
+        if (allQueenIds.includes(queenId)) {
           game.currentQueenId = queenId;
           game.phase = "SELECTING_BOX";
           game.activeBoxNumber = null;
@@ -106,7 +106,7 @@ export async function POST(req: NextRequest) {
             .filter((id): id is string => Boolean(id))
         );
         if (openedQueens.has(game.currentQueenId)) {
-          const nextQueen = ALL_QUEEN_IDS.find((qId) => !openedQueens.has(qId));
+          const nextQueen = allQueenIds.find((qId) => !openedQueens.has(qId));
           if (nextQueen) {
             game.currentQueenId = nextQueen;
           }
@@ -119,7 +119,7 @@ export async function POST(req: NextRequest) {
         game.currentQueenId = FEMALE_MEMBERS[0].id;
         game.activeBoxNumber = null;
         game.selectedMaleId = null;
-        game.boxes = createInitialBoxes();
+        game.boxes = createInitialBoxes(dynamicQueens.length);
         game.updatedAt = now;
       }
     });
@@ -127,7 +127,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       ok: true,
       gameState: updated.gameState,
-      specialGuestName: getSpecialGuestName(updated),
+      queens: getDynamicQueens(updated),
       rsvps: updated.rsvps,
       serverTime: Date.now(),
     });

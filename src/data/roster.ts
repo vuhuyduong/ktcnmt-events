@@ -169,25 +169,25 @@ export const MALE_TRANSPORT_OPTIONS: {
 }[] = [
   {
     id: "car",
-    label: "🚗 Có Ô tô cá nhân (hỗ trợ đón chị em từ cơ quan ra nhà hàng)",
+    label: "🚗 Có Ô tô cá nhân (hỗ trợ đón chị em từ cơ quan ra The Street)",
     shortLabel: "🚗 Có Ô tô cá nhân đón chị em",
   },
   {
     id: "grab",
-    label: "🚕 Sẵn sàng ghép GrabCar đi cùng chị em lúc 17h15",
-    shortLabel: "🚕 Ghép GrabCar cùng chị em 17h15",
+    label: "🚕 Sẵn sàng ghép GrabCar đi cùng chị em ra quán",
+    shortLabel: "🚕 Ghép GrabCar cùng chị em",
   },
   {
     id: "vanguard",
-    label: "🛵 Đội Tiên phong: Chạy qua nhà hàng lúc 17h00 nhận 06 phần Hoa & giữ bàn",
-    shortLabel: "🛵 Tiên phong 17h00 (Nhận hoa & giữ bàn)",
+    label: "🛵 Đội Tiên phong: Chạy qua The Street trước nhận Hoa tươi & giữ bàn",
+    shortLabel: "🛵 Tiên phong (Nhận hoa & giữ bàn)",
   },
 ];
 
 export const QUICK_WISH_SUGGESTIONS = [
   {
     label: "🌸 Rạng rỡ & Hạnh phúc",
-    text: "Chúc 05 bông hoa KTCNMT và chị khách quý dịp 20/10 luôn trẻ trung, rạng rỡ, ngập tràn niềm vui và mãi là nguồn năng lượng ấm áp của đại gia đình KTCNMT!",
+    text: "Chúc 05 bông hoa KTCNMT và các chị khách quý dịp 20/10 luôn trẻ trung, rạng rỡ, ngập tràn niềm vui và mãi là nguồn năng lượng ấm áp của đại gia đình KTCNMT!",
   },
   {
     label: "✨ Xinh đẹp vượt mọi Deadline",
@@ -195,7 +195,7 @@ export const QUICK_WISH_SUGGESTIONS = [
   },
   {
     label: "🥂 Lung linh & Lộc lá đầy tay",
-    text: "Chúc chị em KTCNMT tối 19/10 lên hình thật lung linh tại The Gangs, xé túi mù trúng lộc lớn và sáng 20/10 thưởng thức trà sữa thật ngọt ngào nhé!",
+    text: "Chúc chị em tối 19/10 lên hình thật lung linh tại The Street, xé túi mù trúng lộc lớn và sáng 20/10 thưởng thức trà sữa thật ngọt ngào nhé!",
   },
 ];
 
@@ -233,7 +233,7 @@ export const BLIND_BOX_REWARDS: BlindBoxReward[] = [
     title: 'Lệnh Bài "Quản Gia Hoàng Gia"',
     fullTitle: 'Lộc Lá #03 + Lệnh Bài "Quản Gia Hoàng Gia"',
     description:
-      'Chỉ định 01 chàng trai làm "Trợ lý riêng" phục vụ gắp đồ nướng, châm đá, lấy khăn giấy tại bàn tiệc trong suốt 15 phút tiếp theo.',
+      'Chỉ định 01 chàng trai làm "Trợ lý riêng" phục vụ gắp mồi ngon, châm đá, lấy khăn giấy tại bàn tiệc trong suốt 15 phút tiếp theo.',
     badge: "🍽️ Quản Gia Hoàng Gia",
   },
   {
@@ -263,11 +263,47 @@ export const BLIND_BOX_REWARDS: BlindBoxReward[] = [
       'Bạn nắm giữ "Kim Bài Miễn Tử" – được quyền chỉ định 01 chàng trai thực hiện bất kỳ 01 yêu cầu lịch sự, vui vẻ nào ngay tại bàn tiệc (hoặc nhận 1 lời cảm ơn thật tình cảm từ người thương/đại diện anh em)!',
     badge: "👑 Kim Bài Miễn Tử",
   },
+  {
+    id: "loc-la-07",
+    code: "Lộc Lá #07",
+    title: 'Lệnh Bài "Đại Sứ Nụ Cười"',
+    fullTitle: 'Lộc Lá #07 + Lệnh Bài "Đại Sứ Nụ Cười"',
+    description:
+      "Chỉ định 01 chàng trai kể một câu chuyện vui hoặc tạo 03 dáng pose ảnh độc lạ nhất để cả bàn tiệc cùng thả tim và cười thật sảng khoái!",
+    badge: "😄 Đại Sứ Nụ Cười",
+  },
+  {
+    id: "loc-la-08",
+    code: "Lộc Lá #08",
+    title: 'Lệnh Bài "Chuyên Gia Pha Chế"',
+    fullTitle: 'Lộc Lá #08 + Lệnh Bài "Chuyên Gia Pha Chế"',
+    description:
+      "Chỉ định 01 chàng trai đích thân chuẩn bị ly thức uống ngon nhất kèm 01 món ăn tâm đắc nhất trên bàn tiệc mời tận tay Nữ Chủ Nhân!",
+    badge: "🍹 Bartender Riêng",
+  },
+  {
+    id: "loc-la-09",
+    code: "Lộc Lá #09",
+    title: 'Lệnh Bài "Phóng Viên Đêm Tiệc"',
+    fullTitle: 'Lộc Lá #09 + Lệnh Bài "Phóng Viên Đêm Tiệc"',
+    description:
+      "Chỉ định 01 chàng trai quay ngay 01 clip Boomerang / Story ngắn 10 giây thật lung linh của Nữ Chủ Nhân cùng hội chị em tại The Street!",
+    badge: "🎬 Đạo Diễn Triệu View",
+  },
+  {
+    id: "loc-la-10",
+    code: "Lộc Lá #10",
+    title: 'Lệnh Bài "Lời Chúc Vàng Mười"',
+    fullTitle: 'Lộc Lá #10 + Lệnh Bài "Lời Chúc Vàng Mười"',
+    description:
+      "Chỉ định 01 chàng trai ứng tác ngay 02 câu thơ hoặc câu đối thật kêu có nhắc tới tên của Nữ Chủ Nhân để chúc mừng ngày 20/10!",
+    badge: "📜 Thi Sĩ KTCNMT",
+  },
 ];
 
 export const RESTAURANT_INFO = {
-  name: "The Gangs – Nguyễn Văn Trỗi",
-  address: "179 Nguyễn Văn Trỗi, Phường 10, Phú Nhuận, TP.HCM",
-  mapsUrl:
-    "https://www.google.com/maps/search/?api=1&query=The+Gangs+179+Nguyen+Van+Troi+Phu+Nhuan+TPHCM",
+  name: "The Street (Chi nhánh 9)",
+  time: "19:00 | Thứ Hai 19/10/2026",
+  address: "134 Nguyễn Thái Học, P. Bến Thành, Quận 1, TP.HCM",
+  mapsUrl: "https://maps.app.goo.gl/j3tjn4kV7pEUrBmY7",
 };

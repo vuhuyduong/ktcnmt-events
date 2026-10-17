@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { STAFF_MEMBERS, MaleTransportOptionId } from "@/data/roster";
-import { getSpecialGuestName, getState, updateState } from "@/lib/store";
+import {
+  getDynamicQueens,
+  getState,
+  syncBoxesWithQueens,
+  updateState,
+} from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +14,7 @@ export async function GET() {
   return NextResponse.json(
     {
       ...state,
-      specialGuestName: getSpecialGuestName(state),
+      queens: getDynamicQueens(state),
       serverTime: Date.now(),
     },
     {
@@ -73,14 +78,21 @@ export async function POST(req: NextRequest) {
         );
         if (!member) return;
 
+        const cleanPlusOneName = hasPlusOne
+          ? String(plusOneName || "").trim() || `Bà xã ${member.shortName}`
+          : "";
+
         draft.rsvps[memberId] = {
           memberId,
           attending: true,
           hasPlusOne: Boolean(hasPlusOne),
-          plusOneName: hasPlusOne ? String(plusOneName || "").trim() : "",
+          plusOneName: cleanPlusOneName,
           transportOption: transportOption as MaleTransportOptionId,
           updatedAt: nowIso,
         };
+
+        // Dynamically adjust number of Blind Boxes & Queens when male +1 registration changes
+        syncBoxesWithQueens(draft);
 
         const trimmedWish = String(wishContent || "").trim();
         if (trimmedWish) {
@@ -105,7 +117,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       ok: true,
       ...updated,
-      specialGuestName: getSpecialGuestName(updated),
+      queens: getDynamicQueens(updated),
       serverTime: Date.now(),
     });
   } catch (err) {

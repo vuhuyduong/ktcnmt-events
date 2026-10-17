@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import confetti from "canvas-confetti";
 import {
+  ArrowLeft,
   Calendar,
   Car,
   Check,
@@ -10,6 +11,7 @@ import {
   Clock,
   Coffee,
   Crown,
+  Dices,
   Gift,
   Heart,
   MapPin,
@@ -22,8 +24,6 @@ import {
   Sparkles,
   Users,
   Wand2,
-  ArrowLeft,
-  Dices,
 } from "lucide-react";
 import MemberAvatar from "@/components/MemberAvatar";
 import {
@@ -36,7 +36,6 @@ import {
   MaleTransportOptionId,
   QUICK_WISH_SUGGESTIONS,
   RESTAURANT_INFO,
-  SPECIAL_GUEST_ID,
   STAFF_MEMBERS,
   SUGAR_LEVELS,
   StaffMember,
@@ -46,6 +45,7 @@ import type {
   GameState,
   MemberRsvp,
   MilkTeaOrder,
+  QueenParticipant,
   WishItem,
 } from "@/lib/store";
 
@@ -122,8 +122,7 @@ export default function KtcnmtEventApp() {
     Record<string, MilkTeaOrder>
   >({});
   const [wishes, setWishes] = useState<WishItem[]>([]);
-  const [specialGuestName, setSpecialGuestName] =
-    useState<string>("Khách Quý Đặc Biệt");
+  const [serverQueens, setServerQueens] = useState<QueenParticipant[]>([]);
   const [gameState, setGameState] = useState<GameState>({
     isLive: false,
     focusTimestamp: 0,
@@ -202,7 +201,7 @@ export default function KtcnmtEventApp() {
       if (data.rsvps) setRsvps(data.rsvps);
       if (data.milkTeaOrders) setMilkTeaOrders(data.milkTeaOrders);
       if (Array.isArray(data.wishes)) setWishes(data.wishes);
-      if (data.specialGuestName) setSpecialGuestName(data.specialGuestName);
+      if (Array.isArray(data.queens)) setServerQueens(data.queens);
       if (data.gameState) {
         setGameState(data.gameState);
         if (lastFocusTimestampRef.current === 0) {
@@ -214,19 +213,19 @@ export default function KtcnmtEventApp() {
     }
   }, []);
 
-  // 3. Poll /api/game every 1000ms for real-time 14-phone synchronization
+  // 3. Poll /api/game every 1000ms for real-time synchronization
   const pollGameState = useCallback(async () => {
     try {
       const res = await fetch("/api/game", { cache: "no-store" });
       if (!res.ok) return;
       const data = await res.json();
-      if (data.specialGuestName) setSpecialGuestName(data.specialGuestName);
+      if (Array.isArray(data.queens)) setServerQueens(data.queens);
       if (data.rsvps) setRsvps(data.rsvps);
       if (data.gameState) {
         const nextGame: GameState = data.gameState;
         setGameState(nextGame);
 
-        // Auto-Focus all 14 phones to Tab 3 (Mini-Game) when Host broadcasts START_LIVE
+        // Auto-Focus all phones to Tab 3 (Mini-Game) when Host broadcasts START_LIVE
         if (
           nextGame.isLive &&
           nextGame.focusTimestamp > 0 &&
@@ -296,7 +295,7 @@ export default function KtcnmtEventApp() {
     }
   }, [isHydrated, currentUser, activeTab]);
 
-  // Fire synchronized confetti across all 14 phones when phase transitions to REVEALED or MALE_SELECTED
+  // Fire synchronized confetti across all phones when phase transitions to REVEALED or MALE_SELECTED
   useEffect(() => {
     if (
       gameState.phase === "REVEALED" &&
@@ -387,6 +386,7 @@ export default function KtcnmtEventApp() {
         const data = await res.json();
         if (data.rsvps) setRsvps(data.rsvps);
         if (data.milkTeaOrders) setMilkTeaOrders(data.milkTeaOrders);
+        if (Array.isArray(data.queens)) setServerQueens(data.queens);
         fireLuxuryConfetti("soft");
         showToast(
           `🌸 Đã lưu xác nhận tham dự & Order trà sữa của ${currentUser.shortName}!`
@@ -409,7 +409,9 @@ export default function KtcnmtEventApp() {
           action: "SUBMIT_MALE_RSVP",
           memberId: currentUser.id,
           hasPlusOne,
-          plusOneName: hasPlusOne ? plusOneNameInput.trim() : "",
+          plusOneName: hasPlusOne
+            ? plusOneNameInput.trim() || `Bà xã ${currentUser.shortName}`
+            : "",
           transportOption: maleTransport,
           wishContent: wishInput.trim(),
         }),
@@ -418,15 +420,16 @@ export default function KtcnmtEventApp() {
         const data = await res.json();
         if (data.rsvps) setRsvps(data.rsvps);
         if (Array.isArray(data.wishes)) setWishes(data.wishes);
-        if (data.specialGuestName) setSpecialGuestName(data.specialGuestName);
+        if (Array.isArray(data.queens)) setServerQueens(data.queens);
+        if (data.gameState) setGameState(data.gameState);
         if (wishInput.trim()) {
           setWishInput("");
         }
         fireLuxuryConfetti("soft");
         showToast(
-          `🥂 Đã xác nhận tham dự${
-            wishInput.trim() ? " & đăng lời chúc lên tường KTCNMT" : ""
-          }!`
+          `🥂 Đã cập nhật điểm danh${
+            hasPlusOne ? " (+1 Khách quý)" : ""
+          }${wishInput.trim() ? " & gửi lời chúc" : ""}!`
         );
       }
     } finally {
@@ -436,7 +439,6 @@ export default function KtcnmtEventApp() {
 
   // Like a wish on Live Wall (Screen 3)
   const handleLikeWish = async (wishId: string) => {
-    // Optimistic UI update
     setWishes((prev) =>
       prev.map((w) => (w.id === wishId ? { ...w, likes: w.likes + 1 } : w))
     );
@@ -467,18 +469,46 @@ export default function KtcnmtEventApp() {
             lastFocusTimestampRef.current = data.gameState.focusTimestamp;
           }
         }
-        if (data.specialGuestName) setSpecialGuestName(data.specialGuestName);
+        if (Array.isArray(data.queens)) setServerQueens(data.queens);
       }
     } catch {
       // Ignore error
     }
   };
 
-  // Computed metrics for Live Wall (Screen 3)
+  // Dynamic Queens list (5 Female Staff + Registered Wives/Girlfriends of Male Staff)
+  const gameQueens: QueenParticipant[] = useMemo(() => {
+    if (serverQueens.length > 0) return serverQueens;
+    const staffQueens: QueenParticipant[] = FEMALE_MEMBERS.map((f) => ({
+      id: f.id,
+      shortName: f.shortName,
+      fullName: f.fullName,
+      isGuest: false,
+    }));
+    const guestQueens: QueenParticipant[] = MALE_MEMBERS.filter(
+      (m) => rsvps[m.id]?.attending && rsvps[m.id]?.hasPlusOne
+    ).map((m) => {
+      const name = rsvps[m.id]?.plusOneName?.trim() || `Bà xã ${m.shortName}`;
+      return {
+        id: `guest-${m.id}`,
+        shortName: name,
+        fullName: `${name} (Đi cùng ${m.shortName})`,
+        isGuest: true,
+        companionMaleId: m.id,
+        companionMaleName: m.shortName,
+      };
+    });
+    return [...staffQueens, ...guestQueens];
+  }, [serverQueens, rsvps]);
+
+  // Computed metrics for Live Wall & Logistics
   const stats = useMemo(() => {
     const attendingMembers = Object.values(rsvps).filter((r) => r.attending);
-    const plusOneCount = attendingMembers.filter((r) => r.hasPlusOne).length;
+    const plusOneList = attendingMembers.filter((r) => r.hasPlusOne);
+    const plusOneCount = plusOneList.length;
     const totalAttendees = attendingMembers.length + plusOneCount;
+    const totalExpectedSeats = STAFF_MEMBERS.length + plusOneCount; // 13 + plusOneCount (default 15)
+    const totalQueensCount = FEMALE_MEMBERS.length + plusOneCount; // 5 + plusOneCount (default 7)
     const orderedTeaCount = FEMALE_MEMBERS.filter((f) =>
       Boolean(milkTeaOrders[f.id]?.drinkName)
     ).length;
@@ -487,27 +517,12 @@ export default function KtcnmtEventApp() {
       attendingMembersCount: attendingMembers.length,
       plusOneCount,
       totalAttendees,
+      totalExpectedSeats,
+      totalQueensCount,
       orderedTeaCount,
       totalWishes,
     };
   }, [rsvps, milkTeaOrders, wishes]);
-
-  // 06 Queens list for Mini-Game (05 Female Members + 01 Special Guest)
-  const gameQueens = useMemo(
-    () => [
-      ...FEMALE_MEMBERS.map((f) => ({
-        id: f.id,
-        shortName: f.shortName,
-        fullName: f.fullName,
-      })),
-      {
-        id: SPECIAL_GUEST_ID,
-        shortName: specialGuestName,
-        fullName: specialGuestName,
-      },
-    ],
-    [specialGuestName]
-  );
 
   const currentQueenObj = useMemo(
     () =>
@@ -539,14 +554,11 @@ export default function KtcnmtEventApp() {
     if (!currentUser) return false;
     if (currentUser.isHost) return true;
     if (currentUser.id === gameState.currentQueenId) return true;
-    if (
-      gameState.currentQueenId === SPECIAL_GUEST_ID &&
-      rsvps[currentUser.id]?.hasPlusOne
-    ) {
+    if (gameState.currentQueenId === `guest-${currentUser.id}`) {
       return true;
     }
     return false;
-  }, [currentUser, gameState.currentQueenId, rsvps]);
+  }, [currentUser, gameState.currentQueenId]);
 
   // Prevent screen flicker before localStorage hydration completes
   if (!isHydrated) {
@@ -576,11 +588,15 @@ export default function KtcnmtEventApp() {
         <div className="pointer-events-none fixed bottom-0 left-1/2 -translate-x-1/2 w-80 h-80 rounded-full bg-amber-500/10 blur-3xl" />
 
         <div className="space-y-5 relative z-10">
-          {/* Top Event Header */}
+          {/* Top Event Header with ACV Logo */}
           <div className="text-center space-y-2 pt-1">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-white/10 backdrop-blur-md border border-rose-300/30 text-xs font-medium text-rose-200 shadow-lg">
-              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-              <span>PHÒNG KTCNMT • ACV • 19–20/10/2026</span>
+            <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-rose-300/30 text-xs font-medium text-rose-200 shadow-lg">
+              <img
+                src="/acv-logo.png"
+                alt="ACV Logo"
+                className="h-5 w-auto rounded bg-white px-1.5 py-0.5 object-contain"
+              />
+              <span>PHÒNG KTCNMT • 19–20/10/2026</span>
             </div>
             <h1 className="text-2xl font-extrabold tracking-tight bg-gradient-to-r from-rose-200 via-pink-100 to-amber-200 bg-clip-text text-transparent">
               Happy Vietnamese Women&apos;s Day
@@ -601,7 +617,7 @@ export default function KtcnmtEventApp() {
                 </h2>
               </div>
               <span className="text-[11px] px-2 py-0.5 rounded-full bg-rose-500/25 border border-rose-300/30 text-rose-200 font-medium">
-                Queens Spotlight
+                +{stats.plusOneCount} Khách Quý VIP
               </span>
             </div>
 
@@ -708,7 +724,7 @@ export default function KtcnmtEventApp() {
         {/* Footer note */}
         <footer className="pt-5 pb-2 text-center text-[11px] text-slate-400">
           <span>
-            ✓ Dấu tích xanh góc ảnh hiển thị thành viên đã xác nhận tham dự
+            ✓ {RESTAURANT_INFO.name} • {RESTAURANT_INFO.time}
           </span>
         </footer>
       </main>
@@ -730,11 +746,16 @@ export default function KtcnmtEventApp() {
 
       {/* STICKY TOP HEADER */}
       <header className="sticky top-0 z-40 px-4 py-2.5 bg-slate-950/80 backdrop-blur-xl border-b border-white/10 flex items-center justify-between">
-        {/* Trái: Huy hiệu ✨ KTCNMT • 20/10 + chấm tròn xanh lá nhấp nháy */}
+        {/* Trái: Logo ACV + Huy hiệu ✨ KTCNMT • 20/10 + chấm tròn xanh lá nhấp nháy */}
         <div className="flex items-center gap-2">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/15">
+          <div className="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-full bg-white/10 border border-white/15">
+            <img
+              src="/acv-logo.png"
+              alt="ACV"
+              className="h-4 w-auto rounded bg-white px-1 py-0.5 object-contain"
+            />
             <span className="text-xs font-bold bg-gradient-to-r from-rose-300 via-pink-200 to-amber-200 bg-clip-text text-transparent">
-              ✨ KTCNMT • 20/10
+              KTCNMT • 20/10
             </span>
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
@@ -849,26 +870,26 @@ export default function KtcnmtEventApp() {
                       </span>
                     </div>
                     <p className="text-xs text-amber-50/95 leading-relaxed mt-1.5">
-                      Sau ngày họp ở ACV, cả phòng sẽ đi thẳng tới nhà hàng. Bạn
-                      nhớ mang theo một bộ váy/trang phục đi tiệc thật xinh để
-                      thay lúc 16h45 lên hình cho lung linh nhé!
+                      Sau ngày họp ở ACV, cả phòng sẽ cùng di chuyển tới nhà
+                      hàng. Bạn nhớ mang theo một bộ váy/trang phục đi tiệc thật
+                      xinh để thay sau giờ họp lên hình cho lung linh nhé!
                     </p>
                   </div>
                 </div>
 
-                {/* Mốc 3: 18:00 - Tiệc Tối & Trao Hoa */}
+                {/* Mốc 3: 19:00 - Tiệc Tối & Trao Hoa tại The Street */}
                 <div className="relative pl-9">
                   <span className="absolute left-2 top-1 w-3 h-3 rounded-full bg-emerald-400 ring-4 ring-emerald-400/20" />
                   <div className="rounded-xl p-3 bg-white/5 border border-white/10 space-y-2.5">
                     <div>
                       <div className="text-xs font-bold text-emerald-300">
-                        18:00 | Tiệc Tối & Trao Hoa
+                        19:00 | Tiệc Tối & Trao Hoa (19/10)
                       </div>
                       <p className="text-xs font-semibold text-white mt-0.5">
-                        Nhà hàng {RESTAURANT_INFO.name}
+                        {RESTAURANT_INFO.name}
                       </p>
                       <p className="text-[11px] text-slate-300">
-                        {RESTAURANT_INFO.address}
+                        📍 {RESTAURANT_INFO.address}
                       </p>
                     </div>
                     <a
@@ -878,7 +899,7 @@ export default function KtcnmtEventApp() {
                       className="inline-flex items-center justify-center gap-1.5 w-full min-h-[44px] px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/20 text-xs font-semibold text-amber-200 active:scale-95 transition-all"
                     >
                       <MapPin className="w-4 h-4 text-rose-400" />
-                      <span>Mở Google Maps chỉ đường tới The Gangs</span>
+                      <span>Mở Google Maps chỉ đường tới The Street</span>
                     </a>
                   </div>
                 </div>
@@ -1012,7 +1033,7 @@ export default function KtcnmtEventApp() {
               </div>
             </section>
 
-            {/* Thẻ 4: Ghép Xe Lúc 17h15 & Xác Nhận */}
+            {/* Thẻ 4: Ghép Xe & Xác Nhận */}
             <section className="rounded-2xl p-4 bg-white/10 backdrop-blur-md border border-white/15 shadow-xl space-y-4">
               <label className="flex items-start gap-3 cursor-pointer select-none">
                 <input
@@ -1022,8 +1043,9 @@ export default function KtcnmtEventApp() {
                   className="mt-0.5 w-5 h-5 rounded accent-rose-500 shrink-0"
                 />
                 <span className="text-xs text-slate-100 leading-relaxed">
-                  🚗 Đăng ký đi cùng xe (Ô tô / GrabCar chung) của phòng từ cơ
-                  quan ra nhà hàng lúc 17h15 chiều 19/10
+                  🚗 Đăng ký đi cùng xe (Ô tô / GrabCar chung) của phòng tới{" "}
+                  <strong>{RESTAURANT_INFO.name}</strong> (134 Nguyễn Thái Học,
+                  P. Bến Thành) chiều tối 19/10
                 </span>
               </label>
 
@@ -1045,7 +1067,8 @@ export default function KtcnmtEventApp() {
                 <div className="rounded-xl p-3 bg-emerald-500/15 border border-emerald-400/30 flex items-center gap-2 text-xs text-emerald-200">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                   <span>
-                    Đã chốt: <strong>{milkTeaOrders[currentUser.id].drinkName}</strong> (
+                    Đã chốt:{" "}
+                    <strong>{milkTeaOrders[currentUser.id].drinkName}</strong> (
                     {milkTeaOrders[currentUser.id].sugar},{" "}
                     {milkTeaOrders[currentUser.id].ice})
                   </span>
@@ -1079,7 +1102,7 @@ export default function KtcnmtEventApp() {
                   Xin chào {currentUser.shortName}! 🥂
                 </h2>
                 <p className="text-xs text-slate-300">
-                  Cùng chuẩn bị một mùa 20/10 thật chu đáo cho chị em phòng mình
+                  Tiệc tối 19h00 ngày 19/10 tại {RESTAURANT_INFO.name}
                 </p>
               </div>
             </div>
@@ -1089,7 +1112,7 @@ export default function KtcnmtEventApp() {
               <div className="flex items-center justify-between gap-3">
                 <div className="space-y-0.5">
                   <h3 className="text-sm font-bold text-amber-200">
-                    1. Điểm Danh & Khách Quý Đi Cùng (+1)
+                    1. Điểm Danh & Đăng Ký Vợ / Bạn Gái Đi Cùng (+1)
                   </h3>
                   <p className="text-xs text-slate-300">
                     Tôi có dẫn theo Vợ / Bạn gái tham dự cùng (+1 Khách quý)
@@ -1114,29 +1137,42 @@ export default function KtcnmtEventApp() {
                 </button>
               </div>
 
+              <div className="rounded-xl p-2.5 bg-white/5 border border-white/10 text-[11px] text-slate-300">
+                🌸 Tổng số chị em dự tiệc hiện tại:{" "}
+                <strong className="text-rose-200">
+                  {stats.totalQueensCount} chị em
+                </strong>{" "}
+                (05 bạn nữ trong phòng +{" "}
+                <strong className="text-amber-200">
+                  {stats.plusOneCount} Vợ/Bạn gái
+                </strong>{" "}
+                theo đăng ký của anh em). Số lượng hộp Túi Mù & Hoa tươi sẽ tự
+                động co giãn theo số đăng ký này!
+              </div>
+
               {hasPlusOne && (
                 <div className="rounded-xl p-3 bg-amber-500/15 border border-amber-300/35 space-y-2">
                   <label className="text-xs font-semibold text-amber-100 block">
-                    Nhập Tên gọi thân mật của Vợ / Bạn gái (cập nhật vào Hộp Túi
-                    Mù #6 & chuẩn bị hoa):
+                    Nhập Tên gọi thân mật của Vợ / Bạn gái (cập nhật tự động vào
+                    danh sách Túi Mù Nữ Hoàng & chuẩn bị hoa):
                   </label>
                   <input
                     type="text"
                     value={plusOneNameInput}
                     onChange={(e) => setPlusOneNameInput(e.target.value)}
-                    placeholder="Ví dụ: Chị Hương / Bà xã..."
+                    placeholder={`Ví dụ: Bà xã ${currentUser.shortName} / Chị...`}
                     className="w-full min-h-[44px] px-3.5 py-2 rounded-xl bg-slate-950/70 border border-amber-300/40 text-xs text-white placeholder:text-slate-400 focus:outline-none focus:border-amber-300"
                   />
                 </div>
               )}
             </section>
 
-            {/* Thẻ 2: Đăng Ký Hỗ Trợ Di Chuyển Lúc 17h15 (Ngày 19/10) */}
+            {/* Thẻ 2: Đăng Ký Hỗ Trợ Di Chuyển (Ngày 19/10) */}
             <section className="rounded-2xl p-4 bg-white/10 backdrop-blur-md border border-white/15 shadow-xl space-y-3">
               <div className="flex items-center gap-2">
                 <Car className="w-4 h-4 text-amber-300" />
                 <h3 className="text-sm font-bold text-amber-200">
-                  2. Đăng Ký Hỗ Trợ Di Chuyển Lúc 17h15 (19/10)
+                  2. Đăng Ký Hỗ Trợ Di Chuyển Ra Quán (19/10)
                 </h3>
               </div>
 
@@ -1203,7 +1239,7 @@ export default function KtcnmtEventApp() {
                 rows={3}
                 value={wishInput}
                 onChange={(e) => setWishInput(e.target.value)}
-                placeholder="Nhập lời chúc gửi tới 05 bông hoa KTCNMT và chị khách quý..."
+                placeholder="Nhập lời chúc gửi tới 05 bông hoa KTCNMT và các chị khách quý..."
                 className="w-full p-3 rounded-xl bg-slate-950/60 border border-white/15 text-xs text-white placeholder:text-slate-400 focus:outline-none focus:border-amber-300 leading-relaxed"
               />
 
@@ -1240,18 +1276,38 @@ export default function KtcnmtEventApp() {
                 <li className="flex items-start gap-2">
                   <span className="text-amber-300 font-bold">•</span>
                   <span>
-                    <strong>Tối 19/10 (18h00):</strong> Tặng{" "}
-                    <strong>06 phần hoa tươi</strong> ngay đầu bữa tiệc (5 bạn
-                    nữ + 1 chị vợ đi cùng) trước khi dùng bữa để chị em chụp ảnh
-                    đẹp nhất.
+                    <strong>Địa điểm & Thời gian:</strong>{" "}
+                    <strong>19h00 Thứ Hai 19/10</strong> tại{" "}
+                    <strong>{RESTAURANT_INFO.name}</strong> (
+                    {RESTAURANT_INFO.address}).{" "}
+                    <a
+                      href={RESTAURANT_INFO.mapsUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-amber-300 underline font-semibold"
+                    >
+                      Xem bản đồ
+                    </a>
+                  </span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-amber-300 font-bold">•</span>
+                  <span>
+                    <strong>Hoa tươi tối 19/10:</strong> Tặng{" "}
+                    <strong className="text-rose-200">
+                      {stats.totalQueensCount} phần hoa tươi
+                    </strong>{" "}
+                    ngay đầu bữa tiệc (05 bạn nữ trong phòng +{" "}
+                    {stats.plusOneCount} vợ/bạn gái đi cùng) trước khi dùng bữa
+                    để chị em chụp ảnh đẹp nhất.
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-amber-300 font-bold">•</span>
                   <span>
                     <strong>Sáng 20/10 (09h00):</strong> Đặt{" "}
-                    <strong>05 ly trà sữa</strong> trao tận bàn làm việc theo
-                    danh sách Realtime bên dưới.
+                    <strong>05 ly trà sữa</strong> trao tận bàn làm việc cho 05
+                    bạn nữ trong phòng theo danh sách Realtime bên dưới.
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
@@ -1345,7 +1401,9 @@ export default function KtcnmtEventApp() {
                 <p className="text-[11px] text-slate-300">Quân số tham dự</p>
                 <p className="text-xl font-extrabold text-emerald-300 mt-0.5">
                   {stats.totalAttendees}
-                  <span className="text-xs font-normal text-slate-400">/14</span>
+                  <span className="text-xs font-normal text-slate-400">
+                    /{stats.totalExpectedSeats}
+                  </span>
                 </p>
                 <p className="text-[10px] text-slate-400">
                   {stats.attendingMembersCount} TV + {stats.plusOneCount} Khách
@@ -1361,12 +1419,38 @@ export default function KtcnmtEventApp() {
               </div>
 
               <div className="rounded-2xl p-3 bg-white/10 backdrop-blur-md border border-white/15 text-center shadow-lg">
-                <p className="text-[11px] text-slate-300">Lời chúc</p>
+                <p className="text-[11px] text-slate-300">Phái đẹp dự tiệc</p>
                 <p className="text-xl font-extrabold text-rose-300 mt-0.5">
-                  {stats.totalWishes}
+                  {stats.totalQueensCount}
                 </p>
-                <p className="text-[10px] text-slate-400">Gửi phái đẹp</p>
+                <p className="text-[10px] text-slate-400">
+                  5 Nữ + {stats.plusOneCount} Vợ/BG
+                </p>
               </div>
+            </section>
+
+            {/* Thẻ Địa Điểm Tiệc Tối 19h00 Ngày 19/10 */}
+            <section className="rounded-2xl p-3.5 bg-gradient-to-r from-rose-500/20 via-slate-900/80 to-amber-500/20 backdrop-blur-md border border-rose-300/30 flex items-center justify-between gap-3 shadow-lg">
+              <div className="min-w-0">
+                <p className="text-[11px] font-bold text-amber-300 uppercase">
+                  🥂 Tiệc Tối: {RESTAURANT_INFO.time}
+                </p>
+                <p className="text-sm font-extrabold text-white truncate">
+                  {RESTAURANT_INFO.name}
+                </p>
+                <p className="text-[11px] text-slate-300 truncate">
+                  📍 {RESTAURANT_INFO.address}
+                </p>
+              </div>
+              <a
+                href={RESTAURANT_INFO.mapsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="min-h-[40px] px-3 py-2 rounded-xl bg-amber-400 text-slate-950 text-xs font-extrabold shrink-0 flex items-center gap-1 active:scale-95 transition-all"
+              >
+                <MapPin className="w-3.5 h-3.5" />
+                <span>Bản đồ</span>
+              </a>
             </section>
 
             {/* Tường Lời Chúc Phái Đẹp */}
@@ -1375,7 +1459,7 @@ export default function KtcnmtEventApp() {
                 <div className="flex items-center gap-2">
                   <Heart className="w-4 h-4 text-rose-400 fill-rose-400" />
                   <h3 className="text-sm font-bold uppercase tracking-wide text-rose-200">
-                    Tường Lời Chúc Phái Đẹp KTCNMT
+                    Tường Lời Chúc Phái Đẹp ({stats.totalWishes})
                   </h3>
                 </div>
                 <span className="text-[11px] text-slate-300">
@@ -1431,19 +1515,20 @@ export default function KtcnmtEventApp() {
               </div>
             </section>
 
-            {/* Danh Sách Điểm Danh & Ghép Xe 17h15 */}
+            {/* Danh Sách Điểm Danh & Ghép Xe */}
             <section className="rounded-2xl p-4 bg-white/10 backdrop-blur-md border border-white/15 shadow-xl space-y-4">
               <div className="flex items-center gap-2">
                 <Users className="w-4 h-4 text-amber-300" />
                 <h3 className="text-sm font-bold uppercase tracking-wide text-amber-200">
-                  Điểm Danh & Điều Phối Ghép Xe 17h15
+                  Điểm Danh & Điều Phối Di Chuyển
                 </h3>
               </div>
 
-              {/* Nhóm Nữ & Ghép xe 17h15 */}
+              {/* Nhóm Nữ & Khách quý (+1) */}
               <div className="space-y-2">
                 <h4 className="text-xs font-semibold text-rose-200">
-                  🌸 05 Bông Hoa KTCNMT & Khách Quý (+1):
+                  🌸 {stats.totalQueensCount} Chị Em Dự Tiệc (05 Nữ KTCNMT +{" "}
+                  {stats.plusOneCount} Khách Quý VIP):
                 </h4>
                 <div className="grid grid-cols-1 gap-2">
                   {FEMALE_MEMBERS.map((f) => {
@@ -1470,7 +1555,7 @@ export default function KtcnmtEventApp() {
                             <p className="text-[11px] text-slate-300">
                               {isAttending
                                 ? rsvp?.joinSharedRide1715
-                                  ? "🚗 Đi xe chung lúc 17h15"
+                                  ? "🚗 Đi xe chung của phòng"
                                   : "🛵 Tự túc di chuyển"
                                 : "Chưa xác nhận"}
                             </p>
@@ -1489,45 +1574,40 @@ export default function KtcnmtEventApp() {
                     );
                   })}
 
-                  {/* Hiển thị Khách quý (+1) nếu có anh em đăng ký */}
-                  {Object.values(rsvps)
-                    .filter((r) => r.attending && r.hasPlusOne)
-                    .map((r) => {
-                      const husband = STAFF_MEMBERS.find(
-                        (m) => m.id === r.memberId
-                      );
-                      return (
-                        <div
-                          key={`plus-one-${r.memberId}`}
-                          className="p-2.5 rounded-xl bg-gradient-to-r from-rose-500/20 to-amber-500/15 border border-rose-300/35 flex items-center justify-between gap-2"
-                        >
-                          <div className="flex items-center gap-2.5">
-                            <MemberAvatar
-                              id={SPECIAL_GUEST_ID}
-                              name={r.plusOneName || "Khách Quý"}
-                              gender="female"
-                              size="sm"
-                              checkedIn
-                            />
-                            <div>
-                              <p className="text-xs font-bold text-rose-100">
-                                {r.plusOneName || "Khách Quý Đặc Biệt"} (+1)
-                              </p>
-                              <p className="text-[11px] text-amber-200/90">
-                                Đi cùng {husband?.shortName}
-                              </p>
-                            </div>
+                  {/* Hiển thị danh sách Vợ / Bạn gái (+1) theo đăng ký của các bạn nam */}
+                  {gameQueens
+                    .filter((q) => q.isGuest)
+                    .map((guestQueen) => (
+                      <div
+                        key={guestQueen.id}
+                        className="p-2.5 rounded-xl bg-gradient-to-r from-rose-500/20 to-amber-500/15 border border-rose-300/35 flex items-center justify-between gap-2"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <MemberAvatar
+                            id={guestQueen.id}
+                            name={guestQueen.shortName}
+                            gender="female"
+                            size="sm"
+                            checkedIn
+                          />
+                          <div>
+                            <p className="text-xs font-bold text-rose-100">
+                              {guestQueen.shortName} (+1)
+                            </p>
+                            <p className="text-[11px] text-amber-200/90">
+                              Đi cùng {guestQueen.companionMaleName}
+                            </p>
                           </div>
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-500/30 text-rose-100 border border-rose-300/40 font-semibold">
-                            Khách Quý VIP 🌸
-                          </span>
                         </div>
-                      );
-                    })}
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-500/30 text-rose-100 border border-rose-300/40 font-semibold">
+                          Khách Quý VIP 🌸
+                        </span>
+                      </div>
+                    ))}
                 </div>
               </div>
 
-              {/* Nhóm Nam & Phân công phương tiện 17h15 */}
+              {/* Nhóm Nam & Phân công phương tiện */}
               <div className="space-y-2">
                 <h4 className="text-xs font-semibold text-amber-200">
                   🥂 08 Anh Em & Đội Hình Hỗ Trợ Di Chuyển:
@@ -1556,7 +1636,11 @@ export default function KtcnmtEventApp() {
                           <div>
                             <p className="text-xs font-bold text-white">
                               {m.shortName}
-                              {rsvp?.hasPlusOne ? " (+1 Khách quý)" : ""}
+                              {rsvp?.hasPlusOne
+                                ? ` (+1: ${
+                                    rsvp.plusOneName || `Bà xã ${m.shortName}`
+                                  })`
+                                : ""}
                             </p>
                             <p className="text-[11px] text-slate-300">
                               {isAttending && transportObj
@@ -1584,7 +1668,7 @@ export default function KtcnmtEventApp() {
         )}
 
         {/* ====================================================================
-            TAB 3: MÀN HÌNH 4 (SÂN KHẤU MINI-GAME ĐỘNG ĐỒNG BỘ 14 MÁY)
+            TAB 3: MÀN HÌNH 4 (SÂN KHẤU MINI-GAME ĐỘNG ĐỒNG BỘ)
            ==================================================================== */}
         {activeTab === "game" && (
           <div className="space-y-4">
@@ -1593,19 +1677,22 @@ export default function KtcnmtEventApp() {
               <div className="flex items-center justify-between mb-2">
                 <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-rose-500/25 border border-rose-400/40 text-[11px] font-bold text-rose-200">
                   <Radio className="w-3.5 h-3.5 text-rose-400 animate-pulse" />
-                  <span>LIVE STAGE • ĐỒNG BỘ 14 ĐIỆN THOẠI</span>
+                  <span>
+                    LIVE STAGE • ĐỒNG BỘ {stats.totalExpectedSeats} MÁY
+                  </span>
                 </div>
                 <span className="text-[11px] text-amber-300 font-semibold">
-                  Đã mở:{" "}
-                  {gameState.boxes.filter((b) => b.isOpened).length}/6 túi
+                  Đã mở: {gameState.boxes.filter((b) => b.isOpened).length}/
+                  {gameState.boxes.length} túi
                 </span>
               </div>
               <h2 className="text-lg font-extrabold bg-gradient-to-r from-rose-200 via-pink-100 to-amber-200 bg-clip-text text-transparent">
                 🎁 Túi Mù Nữ Hoàng & Lệnh Bài
               </h2>
               <p className="text-xs text-slate-300 mt-0.5">
-                06 hộp quà bí mật & 06 Lệnh Bài quyền lực dành tặng 05 Bông Hoa
-                KTCNMT và Chị Khách Quý tại bàn tiệc The Gangs!
+                {gameState.boxes.length} hộp quà bí mật dành tặng 05 Bông Hoa
+                KTCNMT và {stats.plusOneCount} Chị Khách Quý tại{" "}
+                {RESTAURANT_INFO.name}!
               </p>
             </section>
 
@@ -1619,23 +1706,23 @@ export default function KtcnmtEventApp() {
                 </div>
                 <div className="space-y-1.5">
                   <span className="text-[11px] uppercase tracking-widest text-amber-300 font-bold">
-                    COMING UP AT 18:00 • 19/10/2026
+                    COMING UP AT 19:00 • 19/10/2026
                   </span>
                   <h3 className="text-base font-extrabold text-white leading-snug">
-                    Sân khấu Xé Túi Mù Nữ Hoàng sẽ mở sóng tại bàn tiệc The Gangs
-                    tối 19/10
+                    Sân khấu Xé Túi Mù Nữ Hoàng sẽ mở sóng tại bàn tiệc{" "}
+                    {RESTAURANT_INFO.name} tối 19/10
                   </h3>
                   <p className="text-xs text-slate-300 leading-relaxed">
-                    Khi Đạo diễn bấm phát sóng, toàn bộ 14 chiếc điện thoại tại
-                    bàn tiệc sẽ tự động chuyển về sân khấu này để cùng xem từng
-                    Nữ Chủ Nhân xé túi mù!
+                    Khi Đạo diễn bấm phát sóng, toàn bộ điện thoại tại bàn tiệc
+                    sẽ tự động chuyển về sân khấu này để cùng xem từng Nữ Chủ
+                    Nhân xé túi mù!
                   </p>
                 </div>
 
-                {/* Danh sách 06 Nữ Chủ Nhân */}
+                {/* Danh sách Nữ Chủ Nhân động */}
                 <div className="pt-2">
                   <p className="text-[11px] font-semibold text-rose-200 mb-2.5">
-                    👑 06 Nữ Chủ Nhân sở hữu Túi Mù đêm nay:
+                    👑 {gameQueens.length} Nữ Chủ Nhân sở hữu Túi Mù đêm nay:
                   </p>
                   <div className="flex flex-wrap justify-center gap-2">
                     {gameQueens.map((q) => (
@@ -1655,14 +1742,14 @@ export default function KtcnmtEventApp() {
                     onClick={() => sendGameAction({ action: "START_LIVE" })}
                     className="w-full min-h-[48px] py-3 px-4 rounded-xl bg-gradient-to-r from-rose-500 via-pink-500 to-amber-400 text-slate-950 font-extrabold text-sm shadow-[0_0_25px_rgba(244,63,94,0.5)] active:scale-95 transition-all"
                   >
-                    🚀 Bắt Đầu Game / Gom 14 Máy Vào Sân Khấu Ngay
+                    🚀 Bắt Đầu Game / Gom Toàn Bộ Máy Vào Sân Khấu
                   </button>
                 )}
               </section>
             )}
 
             {/* ----------------------------------------------------------------
-                PHASE B: SELECTING_BOX (Bàn cờ 6 Túi Mù)
+                PHASE B: SELECTING_BOX (Bàn cờ Túi Mù)
                ---------------------------------------------------------------- */}
             {gameState.phase === "SELECTING_BOX" && (
               <section className="space-y-4">
@@ -1693,7 +1780,7 @@ export default function KtcnmtEventApp() {
                   )}
                 </div>
 
-                {/* Lưới 06 chiếc Túi Mù */}
+                {/* Lưới các chiếc Túi Mù */}
                 <div className="grid grid-cols-2 gap-3">
                   {gameState.boxes.map((box) => {
                     const reward = BLIND_BOX_REWARDS.find(
@@ -1784,13 +1871,13 @@ export default function KtcnmtEventApp() {
             )}
 
             {/* ----------------------------------------------------------------
-                PHASE C: SHAKING (Hiệu ứng Đang Xé Túi - Kéo dài 2 giây trên cả 14 máy)
+                PHASE C: SHAKING (Hiệu ứng Đang Xé Túi - Kéo dài 2 giây)
                ---------------------------------------------------------------- */}
             {gameState.phase === "SHAKING" && (
               <section className="rounded-2xl p-8 bg-gradient-to-b from-rose-900/50 via-slate-900/80 to-amber-900/40 backdrop-blur-xl border-2 border-amber-300/60 shadow-[0_0_45px_rgba(251,191,36,0.35)] text-center space-y-6 my-2">
                 <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-amber-400/20 border border-amber-300/40 text-xs font-bold text-amber-200">
                   <Sparkles className="w-4 h-4 animate-spin" />
-                  <span>ĐỒNG BỘ TRÊN 14 MÀN HÌNH</span>
+                  <span>ĐỒNG BỘ TRÊN TOÀN BỘ MÀN HÌNH</span>
                 </div>
 
                 {/* Chiếc túi phóng to & rung lắc mạnh liên tục */}
@@ -1993,7 +2080,9 @@ export default function KtcnmtEventApp() {
                         className="flex-1 min-h-[44px] py-2.5 px-3 rounded-xl bg-white/15 hover:bg-white/20 border border-white/25 text-xs font-bold text-white active:scale-95 transition-all flex items-center justify-center gap-1.5"
                       >
                         <ArrowLeft className="w-4 h-4" />
-                        <span>Quay lại Bàn cờ 6 Túi</span>
+                        <span>
+                          Quay lại Bàn cờ {gameState.boxes.length} Túi
+                        </span>
                       </button>
 
                       <button
@@ -2027,20 +2116,22 @@ export default function KtcnmtEventApp() {
                   </span>
                 </div>
 
-                {/* Nút Phát sóng / Gom 14 máy vào Game */}
+                {/* Nút Phát sóng / Gom máy vào Game */}
                 <button
                   type="button"
                   onClick={() => sendGameAction({ action: "START_LIVE" })}
                   className="w-full min-h-[44px] py-2.5 px-3.5 rounded-xl bg-gradient-to-r from-rose-500 to-amber-500 text-slate-950 font-extrabold text-xs shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"
                 >
                   <Radio className="w-4 h-4" />
-                  <span>🚀 Phát sóng / Gom 14 máy vào Game</span>
+                  <span>
+                    🚀 Phát sóng / Gom {stats.totalExpectedSeats} máy vào Game
+                  </span>
                 </button>
 
                 {/* Bộ chọn nhanh: 👑 Chuyển lượt cho */}
                 <div className="space-y-1.5">
                   <p className="text-[11px] font-semibold text-slate-300">
-                    👑 Chuyển lượt mở túi cho (6 Nữ Chủ Nhân):
+                    👑 Chuyển lượt mở túi cho ({gameQueens.length} Nữ Chủ Nhân):
                   </p>
                   <div className="grid grid-cols-3 gap-1.5">
                     {gameQueens.map((q) => {
@@ -2074,7 +2165,7 @@ export default function KtcnmtEventApp() {
                   </div>
                 </div>
 
-                {/* Nút Quay lại Bàn cờ 6 Túi & Nút Reset Mini-Game */}
+                {/* Nút Quay lại Bàn cờ & Nút Reset Mini-Game */}
                 <div className="grid grid-cols-2 gap-2 pt-1">
                   <button
                     type="button"
@@ -2082,7 +2173,7 @@ export default function KtcnmtEventApp() {
                     className="min-h-[44px] px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/20 text-xs font-bold text-white active:scale-95 transition-all flex items-center justify-center gap-1.5"
                   >
                     <ArrowLeft className="w-3.5 h-3.5" />
-                    <span>🔙 Bàn cờ 6 Túi</span>
+                    <span>🔙 Bàn cờ {gameState.boxes.length} Túi</span>
                   </button>
 
                   <button
@@ -2092,7 +2183,9 @@ export default function KtcnmtEventApp() {
                         action: "RESET_GAME",
                         keepLive: gameState.isLive,
                       });
-                      showToast("♻️ Đã Reset & xào lại 6 hộp Túi Mù mới tinh!");
+                      showToast(
+                        `♻️ Đã Reset & xào lại ${gameQueens.length} hộp Túi Mù mới tinh!`
+                      );
                     }}
                     className="min-h-[44px] px-3 py-2 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 border border-rose-400/40 text-xs font-bold text-rose-200 active:scale-95 transition-all flex items-center justify-center gap-1.5"
                   >
@@ -2140,7 +2233,8 @@ export default function KtcnmtEventApp() {
             >
               <span>💬 Tường chung</span>
               <span className="text-[10px] font-normal opacity-80">
-                {stats.totalAttendees}/14 • {stats.totalWishes} lời chúc
+                {stats.totalAttendees}/{stats.totalExpectedSeats} •{" "}
+                {stats.totalQueensCount} Nữ
               </span>
             </button>
 
@@ -2161,7 +2255,7 @@ export default function KtcnmtEventApp() {
               )}
               <span>🎁 Mini-Game</span>
               <span className="text-[10px] font-normal opacity-80">
-                Xé Túi Mù 19/10
+                Xé Túi Mù ({gameState.boxes.length} túi)
               </span>
             </button>
           </div>

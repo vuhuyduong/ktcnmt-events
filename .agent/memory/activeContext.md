@@ -1,13 +1,12 @@
 # Active Context: KTCNMT 20/10 Event Web App
 
 ## Current Focus
-Updated local Docker port to `2010` (`http://localhost:2010`), integrated 11 member profile photos into `public/avatars/` with custom face focal framing in `MemberAvatar.tsx`, added `railway.json` & production build in `Dockerfile`, and initialized the Git repository (`main` branch, remote `git@github.com:vuhuyduong/ktcnmt-events.git`).
+Completed ACV favicon & logo integration, updated venue to **The Street (Chi nhánh 9) – 134 Nguyễn Thái Học, P. Bến Thành** at **19h00 ngày 19/10**, and implemented dynamic female attendee & Blind Box scaling (`5 bạn nữ KTCNMT + Vợ/Bạn gái của các bạn nam`, pre-seeded with Vợ Anh Thái & Vợ Anh Cường).
 
 ## Recent Changes
-- **Port Change (`2010`):** Updated [package.json](file:///home/antigravity/workspace/ktcnmt-events/package.json), [Dockerfile](file:///home/antigravity/workspace/ktcnmt-events/Dockerfile), and [docker-compose.yml](file:///home/antigravity/workspace/ktcnmt-events/docker-compose.yml) to use port `2010` locally (`${PORT:-2010}` for seamless Railway compatibility).
-- **Member Avatars Integrated:** Extracted 11 member photos (`quynh-nhu.jpg`, `ngoc-anh.jpg`, `my-dung.jpg`, `quynh-nga.jpg`, `mong-bang.jpg`, `anh-thai.jpg`, `manh-cuong.jpg`, `van-thuan.jpg`, `ba-kien.jpg`, `gia-khang.jpg`, `hai-minh.jpg`) into `public/avatars/` and added `AVATAR_FOCUS_CLASSES` in [MemberAvatar.tsx](file:///home/antigravity/workspace/ktcnmt-events/src/components/MemberAvatar.tsx) so full-body and portrait shots center cleanly on each member's face.
-- **Git & Railway Preparation:** Created [.gitignore](file:///home/antigravity/workspace/ktcnmt-events/.gitignore), [railway.json](file:///home/antigravity/workspace/ktcnmt-events/railway.json), updated [README.md](file:///home/antigravity/workspace/ktcnmt-events/README.md) with Railway deployment guide, and committed all files to `main`.
+- **Favicon & ACV Logo:** Generated square favicon ([icon.png](file:///home/antigravity/workspace/ktcnmt-events/src/app/icon.png), [apple-icon.png](file:///home/antigravity/workspace/ktcnmt-events/src/app/apple-icon.png), [favicon.ico](file:///home/antigravity/workspace/ktcnmt-events/public/favicon.ico)) and header badge ([acv-logo.png](file:///home/antigravity/workspace/ktcnmt-events/public/acv-logo.png)) from the uploaded ACV logo.
+- **Event Venue & Time Update:** Updated [roster.ts](file:///home/antigravity/workspace/ktcnmt-events/src/data/roster.ts) and [page.tsx](file:///home/antigravity/workspace/ktcnmt-events/src/app/page.tsx) to **The Street (Chi nhánh 9)**, `19h00 ngày 19/10`, `134 Nguyễn Thái Học, P. Bến Thành`, Google Maps link `https://maps.app.goo.gl/j3tjn4kV7pEUrBmY7`.
+- **Dynamic Female Count & Blind Boxes:** Updated [store.ts](file:///home/antigravity/workspace/ktcnmt-events/src/lib/store.ts), [state/route.ts](file:///home/antigravity/workspace/ktcnmt-events/src/app/api/state/route.ts), and [game/route.ts](file:///home/antigravity/workspace/ktcnmt-events/src/app/api/game/route.ts) with `getDynamicQueens()` and `syncBoxesWithQueens()`. Pre-configured `anh-thai` and `manh-cuong` with `hasPlusOne: true` (default 5 + 2 = 7 chị em & 7 hộp Túi Mù, automatically growing/shrinking as male members toggle `+1`).
 
 ## Next Steps
-- Verify container startup on port `2010` (`http://localhost:2010`).
-- Provide GitHub push command / repository creation instructions and Railway deployment guide to user.
+- Commit and push changes to GitHub (`origin/main`) for automatic Railway deployment.

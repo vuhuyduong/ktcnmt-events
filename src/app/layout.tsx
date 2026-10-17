@@ -2,9 +2,16 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "KTCNMT • 20/10 Interactive Event & Live Mini-Game",
+  title: "KTCNMT • 20/10 Interactive Event & Live Mini-Game | ACV",
   description:
-    "Sự kiện kỷ niệm Ngày Phụ nữ Việt Nam (19/10 – 20/10/2026) – Phòng Kỹ thuật Công nghệ Môi trường (KTCNMT) – ACV",
+    "Sự kiện kỷ niệm Ngày Phụ nữ Việt Nam (19/10 – 20/10/2026) – Phòng Kỹ thuật Công nghệ Môi trường (KTCNMT) – Tổng công ty Cảng hàng không Việt Nam (ACV)",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon.png", type: "image/png", sizes: "256x256" },
+    ],
+    apple: [{ url: "/apple-icon.png", sizes: "180x180", type: "image/png" }],
+  },
 };
 
 export const viewport: Viewport = {
