@@ -1,6 +1,7 @@
 import fs from "fs";
 import { randomInt, randomUUID } from "crypto";
 import path from "path";
+import type { PrivateMessage, MemoryRun, MemoryBests } from "@/lib/social";
 import {
   BLIND_BOX_REWARDS,
   FEMALE_MEMBERS,
@@ -92,6 +93,9 @@ export interface AppStateData {
   milkTeaOrders: Record<string, MilkTeaOrder>;
   wishes: WishItem[];
   gameState: GameState;
+  privateMessages: PrivateMessage[];
+  memoryRuns: Record<string, MemoryRun>;
+  memoryScores: Record<string, MemoryBests>;
 }
 
 declare global {
@@ -183,6 +187,9 @@ export function createDefaultState(): AppStateData {
     rsvps: {},
     milkTeaOrders: {},
     wishes: [],
+    privateMessages: [],
+    memoryRuns: {},
+    memoryScores: {},
     gameState: createDefaultGameState(),
   };
 }
@@ -195,7 +202,7 @@ export function getQueenDisplayName(
   const found = queens.find((q) => q.id === queenId);
   if (found) return found.shortName;
   const staff = STAFF_MEMBERS.find((m) => m.id === queenId);
-  return staff ? staff.shortName : "Nữ Hoàng KTCNMT";
+  return staff ? staff.shortName : "Chị em Kỹ thuật công nghệ - Môi trường";
 }
 
 function persistStateToDisk(state: AppStateData): void {
@@ -301,6 +308,74 @@ function readStateFromDisk(): AppStateData {
     keys.every((key) => typeof value[key] === "string");
   const validMemberId = (id: string) =>
     STAFF_MEMBERS.some((member) => member.id === id);
+  // Additive migration: preserve every existing RSVP, order, wish and live game.
+  if (parsed.privateMessages === undefined) parsed.privateMessages = [];
+  if (parsed.memoryRuns === undefined) parsed.memoryRuns = {};
+  if (parsed.memoryScores === undefined) parsed.memoryScores = {};
+  const invalidSocial =
+    !Array.isArray(parsed.privateMessages) ||
+    parsed.privateMessages.some(
+      (m) =>
+        !record(m) ||
+        !strings(m, [
+          "id",
+          "senderId",
+          "recipientId",
+          "content",
+          "createdAt",
+          "requestId",
+        ]) ||
+        !validMemberId(m.senderId) ||
+        !validMemberId(m.recipientId) ||
+        (m.readAt !== undefined && typeof m.readAt !== "string"),
+    ) ||
+    !record(parsed.memoryRuns) ||
+    !record(parsed.memoryScores) ||
+    Object.entries(parsed.memoryRuns).some(
+      ([id, run]) =>
+        !validMemberId(id) ||
+        !record(run) ||
+        typeof run.id !== "string" ||
+        !Array.isArray(run.deck) ||
+        run.deck.length !== 12 ||
+        run.deck.some(
+          (pair) => !Number.isInteger(pair) || pair < 0 || pair > 5,
+        ) ||
+        !Array.isArray(run.open) ||
+        run.open.length > 2 ||
+        run.open.some((i) => !Number.isInteger(i) || i < 0 || i >= 12) ||
+        new Set(run.open).size !== run.open.length ||
+        !Array.isArray(run.matched) ||
+        run.matched.length > 6 ||
+        run.matched.some(
+          (pair) => !Number.isInteger(pair) || pair < 0 || pair > 5,
+        ) ||
+        new Set(run.matched).size !== run.matched.length ||
+        Array.from(
+          { length: 6 },
+          (_, pair) => run.deck.filter((p) => p === pair).length,
+        ).some((count) => count !== 2) ||
+        !Number.isInteger(run.flips) ||
+        run.flips < 0 ||
+        [run.startedAt, run.finishedAt, run.hideAt].some(
+          (t) => t !== null && !Number.isFinite(t),
+        ),
+    ) ||
+    Object.entries(parsed.memoryScores).some(
+      ([id, bests]) =>
+        !validMemberId(id) ||
+        !record(bests) ||
+        [bests.byFlips, bests.byTime].some(
+          (score) =>
+            !record(score) ||
+            score.memberId !== id ||
+            !Number.isInteger(score.flips) ||
+            Number(score.flips) < 12 ||
+            !Number.isFinite(score.durationMs) ||
+            Number(score.durationMs) < 0 ||
+            typeof score.completedAt !== "string",
+        ),
+    );
   const invalidRsvp = Object.entries(parsed.rsvps).some(
     ([id, value]) =>
       !validMemberId(id) ||
@@ -359,6 +434,7 @@ function readStateFromDisk(): AppStateData {
       ));
   if (
     invalidRsvp ||
+    invalidSocial ||
     invalidOrder ||
     invalidWish ||
     invalidBox ||

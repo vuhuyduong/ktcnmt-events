@@ -144,6 +144,323 @@ async function main() {
   const nhu = await login("quynh-nhu");
   const anh = await login("ngoc-anh");
   const admin = await login("huy-duong");
+  // Private inbox and competitive memory game: always use isolated storage.
+  const messages = require("../src/app/api/messages/route.ts");
+  const memory = require("../src/app/api/memory/route.ts");
+  const get = (url, cookie) =>
+    new NextRequest(`http://localhost${url}`, {
+      headers: cookie ? { cookie } : {},
+    });
+  assert.equal((await messages.GET(get("/api/messages"))).status, 401);
+  assert.equal(
+    (await messages.GET(get("/api/messages", "ktcnmt_member=quynh-nhu")))
+      .status,
+    401,
+    "plain identity cookies cannot read private messages",
+  );
+  assert.equal(
+    (await session.POST(req("/api/session", { memberId: "ngoc-anh" }, nhu)))
+      .status,
+    409,
+    "existing session must be explicitly ended before switching",
+  );
+  const dm = {
+    recipientId: "ngoc-anh",
+    content: "Một lời nhắn riêng ♡",
+    requestId: "dm-test-1",
+  };
+  assert.equal(
+    (await messages.POST(req("/api/messages", dm, nhu))).status,
+    200,
+  );
+  await messages.POST(req("/api/messages", dm, nhu));
+  const inbox = async (cookie) =>
+    (await messages.GET(get("/api/messages", cookie))).json();
+  const received = await inbox(anh);
+  assert.equal(
+    received.messages.length,
+    1,
+    "retries do not duplicate messages",
+  );
+  assert.equal(received.messages[0].senderId, "quynh-nhu");
+  assert.equal(
+    (await inbox(admin)).messages.length,
+    0,
+    "even host cannot read others' messages",
+  );
+  assert.equal((await inbox(nhu)).messages[0].recipientId, "ngoc-anh");
+  assert.equal(
+    (
+      await messages.POST(
+        req("/api/messages", { ...dm, senderId: "huy-duong" }, nhu),
+      )
+    ).status,
+    403,
+  );
+  for (const invalid of [
+    { recipientId: "unknown" },
+    { content: " " },
+    { content: "a".repeat(2001) },
+  ]) {
+    assert.equal(
+      (await messages.POST(req("/api/messages", { ...dm, ...invalid }, nhu)))
+        .status,
+      400,
+    );
+  }
+  assert.equal(
+    (
+      await messages.POST(
+        req("/api/messages", { action: "READ", senderId: "quynh-nhu" }, anh),
+      )
+    ).status,
+    200,
+  );
+  assert.ok(
+    (await inbox(nhu)).messages[0].readAt,
+    "recipient can mark messages read",
+  );
+  const anonymous = await (await api.GET(get("/api/state"))).json();
+  assert.equal(
+    anonymous.messages,
+    undefined,
+    "messages never enter shared state payloads",
+  );
+  assert.equal(
+    (await memory.POST(req("/api/memory", { action: "START" }))).status,
+    401,
+  );
+  assert.equal(
+    (
+      await memory.POST(
+        req("/api/memory", { action: "SCORE", flips: 1, durationMs: 1 }, nhu),
+      )
+    ).status,
+    400,
+    "clients cannot submit invented scores",
+  );
+  let round = await (
+    await memory.POST(req("/api/memory", { action: "START" }, nhu))
+  ).json();
+  assert.equal(round.run.cards.length, 12);
+  assert.ok(
+    round.run.cards.every((c) => c.pair === null),
+    "unopened pairs are hidden",
+  );
+  const runId = round.run.id;
+  const secret = store.getState().memoryRuns["quynh-nhu"].deck;
+  for (let pair = 0; pair < 6; pair++) {
+    for (const index of secret.flatMap((value, i) =>
+      value === pair ? [i] : [],
+    )) {
+      round = await (
+        await memory.POST(
+          req("/api/memory", { action: "FLIP", runId, index }, nhu),
+        )
+      ).json();
+    }
+  }
+  assert.equal(round.run.flips, 12);
+  assert.ok(round.run.finishedAt);
+  assert.equal(round.leaderboards.byFlips[0].memberId, "quynh-nhu");
+  assert.equal(round.leaderboards.byFlips[0].flips, 12);
+  assert.equal(round.leaderboards.byTime.length, 1);
+  const publicMemory = await (await memory.GET(get("/api/memory"))).json();
+  assert.equal(
+    publicMemory.run,
+    null,
+    "public viewers cannot inspect another person's run",
+  );
+  assert.equal(
+    (
+      await memory.POST(
+        req("/api/memory", { action: "FLIP", runId, index: 0 }, anh),
+      )
+    ).status,
+    409,
+  );
+  assert.equal(
+    (await messages.GET(get("/api/messages?memberId=quynh-nhu", anh))).status,
+    409,
+    "stale tab cannot read a newly selected identity's inbox",
+  );
+  assert.equal(
+    (
+      await messages.POST(
+        req(
+          "/api/messages",
+          { ...dm, memberId: "quynh-nhu", requestId: "stale-tab" },
+          anh,
+        ),
+      )
+    ).status,
+    409,
+    "stale tab cannot send a preserved draft as the newly selected identity",
+  );
+  assert.equal(
+    (
+      await messages.POST(
+        req(
+          "/api/messages",
+          { action: "READ", senderId: "quynh-nhu", memberId: "quynh-nhu" },
+          anh,
+        ),
+      )
+    ).status,
+    409,
+    "stale tab cannot mark messages read as another identity",
+  );
+  assert.equal(
+    (await memory.GET(get("/api/memory?memberId=quynh-nhu", anh))).status,
+    409,
+  );
+  assert.equal(
+    (
+      await memory.POST(
+        req("/api/memory", { action: "START", memberId: "quynh-nhu" }, anh),
+      )
+    ).status,
+    409,
+    "stale tab cannot start a game under another identity",
+  );
+  const signedToken = nhu.slice("ktcnmt_member=".length);
+  assert.equal(
+    (
+      await messages.GET(
+        get(
+          "/api/messages",
+          `ktcnmt_member=${signedToken.replace("quynh-nhu", "huy-duong")}`,
+        ),
+      )
+    ).status,
+    401,
+    "changing a signed identity invalidates the session",
+  );
+  const forbiddenOrigin = new NextRequest("http://localhost/api/messages", {
+    method: "POST",
+    headers: {
+      cookie: nhu,
+      origin: "https://evil.example",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({ ...dm, requestId: "cross-origin" }),
+  });
+  assert.equal((await messages.POST(forbiddenOrigin)).status, 403);
+  assert.equal(
+    (
+      await messages.POST(
+        req("/api/messages", { ...dm, content: "changed" }, nhu),
+      )
+    ).status,
+    409,
+    "same request id cannot silently send changed text",
+  );
+  assert.equal(
+    (await memory.POST(req("/api/memory", { action: "START" }, anh))).status,
+    200,
+  );
+  let otherRun = store.getState().memoryRuns["ngoc-anh"];
+  const wrongIndex = otherRun.deck.findIndex(
+    (pair) => pair !== otherRun.deck[0],
+  );
+  assert.equal(
+    (
+      await memory.POST(
+        req(
+          "/api/memory",
+          { action: "FLIP", runId: otherRun.id, index: 12 },
+          anh,
+        ),
+      )
+    ).status,
+    400,
+  );
+  await memory.POST(
+    req("/api/memory", { action: "FLIP", runId: otherRun.id, index: 0 }, anh),
+  );
+  assert.equal(
+    (
+      await memory.POST(
+        req(
+          "/api/memory",
+          { action: "FLIP", runId: otherRun.id, index: 0 },
+          anh,
+        ),
+      )
+    ).status,
+    409,
+    "the same card cannot count twice",
+  );
+  await memory.POST(
+    req(
+      "/api/memory",
+      { action: "FLIP", runId: otherRun.id, index: wrongIndex },
+      anh,
+    ),
+  );
+  const blockedIndex = otherRun.deck.findIndex(
+    (_, i) => i !== 0 && i !== wrongIndex,
+  );
+  assert.equal(
+    (
+      await memory.POST(
+        req(
+          "/api/memory",
+          { action: "FLIP", runId: otherRun.id, index: blockedIndex },
+          anh,
+        ),
+      )
+    ).status,
+    409,
+    "a third flip is blocked while mismatched cards remain open",
+  );
+  store.updateState((draft) => {
+    draft.memoryRuns["ngoc-anh"].hideAt = Date.now() - 1;
+  });
+  const hidden = await (await memory.GET(get("/api/memory", anh))).json();
+  assert.ok(
+    hidden.run.cards.every((c) => c.pair === null),
+    "expired mismatches are hidden on reload",
+  );
+  assert.equal(
+    (
+      await memory.POST(
+        req(
+          "/api/memory",
+          { action: "FLIP", runId: otherRun.id, index: blockedIndex },
+          anh,
+        ),
+      )
+    ).status,
+    200,
+  );
+  assert.equal(store.getState().memoryRuns["ngoc-anh"].flips, 3);
+  const { compareFlips, compareTime } = require("../src/lib/social.ts");
+  const { byFlips: score } = store.getState().memoryScores["quynh-nhu"];
+  const faster = { ...score, flips: 14, durationMs: 100 };
+  const fewer = { ...score, flips: 12, durationMs: 1000 };
+  assert.ok(compareFlips(fewer, faster) < 0);
+  assert.ok(compareTime(faster, fewer) < 0);
+  assert.ok(
+    compareFlips({ ...fewer, durationMs: 100 }, fewer) < 0,
+    "flip ties prefer faster runs",
+  );
+  const savedScore = structuredClone(store.getState().memoryScores);
+  global.__ktcnmtStateCache = undefined;
+  assert.deepEqual(
+    store.getState().memoryScores,
+    savedScore,
+    "scores survive reload from disk",
+  );
+  // Old persisted files are migrated in memory without dropping existing data.
+  const oldState = store.getState();
+  delete oldState.privateMessages;
+  delete oldState.memoryRuns;
+  delete oldState.memoryScores;
+  fs.writeFileSync(process.env.STATE_FILE_PATH, JSON.stringify(oldState));
+  global.__ktcnmtStateCache = undefined;
+  assert.deepEqual(store.getState().privateMessages, []);
+  assert.deepEqual(store.getState().memoryRuns, {});
   assert.equal(
     (await session.POST(req("/api/session", { memberId: "unknown" }))).status,
     400,

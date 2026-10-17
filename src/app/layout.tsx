@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { EVENT_INFO } from "@/data/roster";
 import "./globals.css";
 
-const description = `Một buổi hẹn ấm áp cùng KTCNMT. Gặp nhau lúc ${EVENT_INFO.dinner.time} ngày ${EVENT_INFO.dinner.date} tại ${EVENT_INFO.dinner.venue}.`;
+const description = `Một buổi hẹn ấm áp cùng Kỹ thuật công nghệ - Môi trường. Gặp nhau lúc ${EVENT_INFO.dinner.time} ngày ${EVENT_INFO.dinner.date} tại ${EVENT_INFO.dinner.venue}.`;
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://ltia-ktcnmt.up.railway.app"),
@@ -14,7 +14,7 @@ export const metadata: Metadata = {
     locale: "vi_VN",
     title: EVENT_INFO.title,
     description,
-    siteName: "KTCNMT",
+    siteName: "Kỹ thuật công nghệ - Môi trường",
     images: [
       {
         url: "/acv-logo.png",

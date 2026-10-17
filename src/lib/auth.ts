@@ -1,9 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createHmac, randomBytes, timingSafeEqual } from "crypto";
+import fs from "fs";
+import path from "path";
 import { STAFF_MEMBERS } from "@/data/roster";
 import { AppStateData, GameState, getDynamicQueens } from "@/lib/store";
 
-// A remembered roster choice, intentionally not strong authentication.
+// Signed roster choice: prevents editing a cookie to read another inbox.
+// Choosing a portrait remains convenience identity, not proof of identity.
 const COOKIE = "ktcnmt_member";
+const SESSION_AGE = 60 * 60 * 24 * 30;
+function sessionKey(): Buffer {
+  const keyPath = `${process.env.STATE_FILE_PATH || path.join(process.cwd(), "data", "state.json")}.session-key`;
+  fs.mkdirSync(path.dirname(keyPath), { recursive: true });
+  if (!fs.existsSync(keyPath)) {
+    try {
+      fs.writeFileSync(keyPath, randomBytes(32), { flag: "wx", mode: 0o600 });
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+    }
+  }
+  return fs.readFileSync(keyPath);
+}
+function signature(payload: string) {
+  return createHmac("sha256", sessionKey()).update(payload).digest("hex");
+}
 export interface Session {
   memberId: string;
   isAdmin: boolean;
@@ -12,6 +32,7 @@ export class ApiError extends Error {
   constructor(
     public status: number,
     message: string,
+    public code?: string,
   ) {
     super(message);
   }
@@ -22,8 +43,23 @@ export function selectIdentity(memberId: unknown): Session {
   return { memberId: member.id, isAdmin: Boolean(member.isHost) };
 }
 export function getSession(req: NextRequest): Session | null {
+  const token = req.cookies.get(COOKIE)?.value;
+  if (!token) return null;
+  const [memberId, expires, nonce, mac, extra] = token.split(".");
+  if (
+    extra ||
+    !memberId ||
+    !nonce ||
+    !/^\d+$/.test(expires || "") ||
+    !/^[a-f0-9]{64}$/.test(mac || "") ||
+    Number(expires) <= Date.now()
+  )
+    return null;
+  const expected = signature(`${memberId}.${expires}.${nonce}`);
+  if (!timingSafeEqual(Buffer.from(mac, "hex"), Buffer.from(expected, "hex")))
+    return null;
   try {
-    return selectIdentity(req.cookies.get(COOKIE)?.value);
+    return selectIdentity(memberId);
   } catch {
     return null;
   }
@@ -32,13 +68,20 @@ export function setSessionCookie(
   response: NextResponse,
   session: Session | null,
 ) {
-  response.cookies.set(COOKIE, session?.memberId || "", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
-    path: "/",
-    maxAge: session ? 60 * 60 * 24 * 30 : 0,
-  });
+  const payload = session
+    ? `${session.memberId}.${Date.now() + SESSION_AGE * 1000}.${randomBytes(16).toString("hex")}`
+    : "";
+  response.cookies.set(
+    COOKIE,
+    session ? `${payload}.${signature(payload)}` : "",
+    {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      path: "/",
+      maxAge: session ? SESSION_AGE : 0,
+    },
+  );
 }
 export function requireTrustedOrigin(req: NextRequest) {
   const origin = req.headers.get("origin");
@@ -65,6 +108,17 @@ export function requireSession(req: NextRequest) {
   const session = getSession(req);
   if (!session) throw new ApiError(401, "Chọn ảnh của bạn trước nhé.");
   return session;
+}
+export function assertSessionIdentity(
+  session: Session | null,
+  expected: unknown,
+) {
+  if (expected !== undefined && expected !== (session?.memberId ?? null))
+    throw new ApiError(
+      409,
+      "Profile đã thay đổi ở tab khác. Hãy tải lại trang để tiếp tục.",
+      "SESSION_CHANGED",
+    );
 }
 export function requireAdmin(session: Session) {
   if (!session.isAdmin)
@@ -142,7 +196,11 @@ export function statePayload(state: AppStateData, session: Session | null) {
 export function apiError(error: unknown) {
   if (error instanceof ApiError)
     return NextResponse.json(
-      { ok: false, error: error.message },
+      {
+        ok: false,
+        error: error.message,
+        ...(error.code ? { code: error.code } : {}),
+      },
       { status: error.status },
     );
   if (error instanceof SyntaxError)

@@ -10,7 +10,7 @@ export interface StaffMember {
 }
 
 export const STAFF_MEMBERS: StaffMember[] = [
-  // Nhóm 1: 05 Bạn Nữ – "🌸 05 Bông Hoa KTCNMT"
+  // Nhóm 1: 05 Bạn Nữ – "🌸 05 Bông Hoa Kỹ thuật công nghệ - Môi trường"
   {
     id: "quynh-nhu",
     fullName: "Phạm Thị Quỳnh Như",
@@ -47,17 +47,17 @@ export const STAFF_MEMBERS: StaffMember[] = [
     wish: "Mộng Băng thân mến, chúc bạn một ngày 20/10 thật ấm áp. Mong những dự định riêng của bạn có thêm cơ hội, và mỗi ngày đều có niềm vui để mang về.",
   },
 
-  // Nhóm 2: 08 Anh Em Nam – "🥂 08 Anh Em KTCNMT"
+  // Nhóm 2: 08 Anh Em Nam – "🥂 08 Anh Em Kỹ thuật công nghệ - Môi trường"
   {
     id: "trung-kien",
     fullName: "Phạm Trung Kiên",
-    shortName: "Anh Kiên",
+    shortName: "Trung Kiên",
     gender: "male",
   },
   {
     id: "huy-duong",
     fullName: "Vũ Huy Dương",
-    shortName: "Anh Dương",
+    shortName: "Huy Dương",
     gender: "male",
     isHost: true,
   },
@@ -70,7 +70,7 @@ export const STAFF_MEMBERS: StaffMember[] = [
   {
     id: "manh-cuong",
     fullName: "Nguyễn Mạnh Cường",
-    shortName: "Anh Cường",
+    shortName: "Mạnh Cường",
     gender: "male",
   },
   {
@@ -125,11 +125,11 @@ export const MALE_TRANSPORT_OPTIONS: {
 export const QUICK_WISH_SUGGESTIONS = [
   {
     label: "Niềm vui & bình an",
-    text: "Chúc chị em KTCNMT và các khách mời một ngày 20/10 nhiều niềm vui, sức khỏe và bình an. Mong mỗi người luôn có thời gian cho những điều mình yêu thích!",
+    text: "Chúc chị em Kỹ thuật công nghệ - Môi trường và các khách mời một ngày 20/10 nhiều niềm vui, sức khỏe và bình an. Mong mỗi người luôn có thời gian cho những điều mình yêu thích!",
   },
   {
     label: "Thuận lợi & nhiều cơ hội",
-    text: "Nhân ngày Phụ nữ Việt Nam, chúc chị em nhiều sức khỏe, công việc thuận lợi và có thêm cơ hội cho những dự định riêng. Cảm ơn chị em đã cùng xây dựng tập thể KTCNMT!",
+    text: "Nhân ngày Phụ nữ Việt Nam, chúc chị em nhiều sức khỏe, công việc thuận lợi và có thêm cơ hội cho những dự định riêng. Cảm ơn chị em đã cùng xây dựng tập thể Kỹ thuật công nghệ - Môi trường!",
   },
   {
     label: "Một buổi gặp gỡ ấm áp",
@@ -238,14 +238,14 @@ export const BLIND_BOX_REWARDS: BlindBoxReward[] = [
     fullTitle: 'Lộc Lá #10 + Thử thách "Lời Chúc Vàng Mười"',
     description:
       "Mời một người hỗ trợ tự nguyện đọc hai câu thơ yêu thích hoặc gửi một lời chúc 20/10. Không cần ứng tác hay nhắc tên riêng; có thể đổi thử thách hoặc bỏ qua.",
-    badge: "📜 Thi Sĩ KTCNMT",
+    badge: "📜 Thi Sĩ Kỹ thuật công nghệ - Môi trường",
   },
 ];
 
 // Thông tin đã xác nhận được giữ nguyên; chưa có xác nhận thì không tự điền.
 export const EVENT_INFO = {
-  title: "KTCNMT · Chúc mừng ngày 20/10",
-  department: "Phòng Kỹ thuật Công nghệ Môi trường",
+  title: "Kỹ thuật công nghệ - Môi trường · Chúc mừng ngày 20/10",
+  department: "Phòng Kỹ thuật công nghệ - Môi trường",
   organization: "Tổng công ty Cảng hàng không Việt Nam (ACV)",
   dinner: {
     date: "19/10/2026",

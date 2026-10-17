@@ -9,7 +9,11 @@ import {
   Heart,
   MapPin,
   MessageSquareHeart,
+  Mail,
 } from "lucide-react";
+import EventCountdown from "@/components/EventCountdown";
+import FlowerWelcome from "@/components/FlowerWelcome";
+import PrivateInbox from "@/components/PrivateInbox";
 import MemoryGame from "@/components/MemoryGame";
 import MemberAvatar from "@/components/MemberAvatar";
 import {
@@ -26,7 +30,7 @@ import type {
   WishItem,
 } from "@/lib/store";
 
-type Tab = "personal" | "wall" | "game";
+type Tab = "personal" | "wall" | "game" | "messages";
 type Attendance = "attending" | "maybe" | "declined" | "";
 type Session = {
   memberId: string | null;
@@ -117,6 +121,15 @@ export default function EventApp() {
   const [gamePending, setGamePending] = useState(false);
   const [resetConfirm, setResetConfirm] = useState(false);
   const [logoutConfirm, setLogoutConfirm] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+  const [switchError, setSwitchError] = useState("");
+  const [unreadMessages, setUnreadMessages] = useState(0);
+  const inboxDirty = useRef(false);
+  const accountClicks = useRef<number[]>([]);
+  const logoutDialog = useRef<HTMLDialogElement>(null);
+  const onInboxDirty = useCallback((value: boolean) => {
+    inboxDirty.current = value;
+  }, []);
   const [pendingLike, setPendingLike] = useState("");
   const [presentation, setPresentation] = useState(false);
   const initializedFor = useRef<string | null>(null);
@@ -295,7 +308,7 @@ export default function EventApp() {
 
   useEffect(() => {
     const protectDraft = (event: BeforeUnloadEvent) => {
-      if (dirty.current) event.preventDefault();
+      if (dirty.current || inboxDirty.current) event.preventDefault();
     };
     window.addEventListener("beforeunload", protectDraft);
     return () => window.removeEventListener("beforeunload", protectDraft);
@@ -319,6 +332,25 @@ export default function EventApp() {
       disableForReducedMotion: true,
     });
   }, [tab, game.phase, game.activeBoxNumber, game.phaseStartedAt]);
+
+  useEffect(() => {
+    const dialog = logoutDialog.current;
+    if (logoutConfirm && dialog && !dialog.open) dialog.showModal();
+    else if (!logoutConfirm && dialog?.open) dialog.close();
+  }, [logoutConfirm]);
+
+  function accountClick() {
+    const now = Date.now();
+    accountClicks.current = [
+      ...accountClicks.current.filter((t) => now - t < 1000),
+      now,
+    ];
+    if (accountClicks.current.length >= 3) {
+      accountClicks.current = [];
+      setSwitchError("");
+      setLogoutConfirm(true);
+    }
+  }
 
   function navigate(next: Tab) {
     setTab(next);
@@ -361,7 +393,9 @@ export default function EventApp() {
     }
   }
   async function logout() {
-    if (saving || gamePending || pendingLike) return;
+    if (saving || gamePending || pendingLike || signingOut) return;
+    setSigningOut(true);
+    setSwitchError("");
     try {
       const result = await fetch("/api/session", {
         method: "DELETE",
@@ -372,6 +406,8 @@ export default function EventApp() {
       currentIdentity.current = null;
       initializedFor.current = null;
       dirty.current = false;
+      inboxDirty.current = false;
+      setUnreadMessages(0);
       setSession((previous) => ({
         ...previous,
         memberId: null,
@@ -385,7 +421,9 @@ export default function EventApp() {
       navigate("personal");
       await refresh();
     } catch {
-      setMessage("Chưa đổi được người. Kiểm tra kết nối và thử lại nhé.");
+      setSwitchError("Chưa đăng xuất được. Kiểm tra kết nối và thử lại nhé.");
+    } finally {
+      setSigningOut(false);
     }
   }
   async function save(event: React.FormEvent) {
@@ -516,7 +554,7 @@ export default function EventApp() {
           ? `Gửi ${user.shortName},`
           : user
             ? `Chào ${user.shortName},`
-            : "Gửi những bông hoa KTCNMT,"}
+            : "Gửi những bông hoa của phòng,"}
       </h2>
       <p className="invitation-lead">
         Một buổi hẹn,
@@ -527,9 +565,11 @@ export default function EventApp() {
         {user?.wish ||
           (user
             ? "Cùng anh em chuẩn bị một buổi tối thật vui cho chị em nhé. Có mặt, đồng hành hay gửi một lời chúc — cứ chọn điều phù hợp với mình."
-            : "Một lời chúc nhỏ, một buổi tối bên nhau. Anh em KTCNMT mến chúc chị em ngày 20/10 thật vui, bình an và luôn được yêu thương.")}
+            : "Một lời chúc nhỏ, một buổi tối bên nhau. Anh em Kỹ thuật công nghệ - Môi trường mến chúc chị em ngày 20/10 thật vui, bình an và luôn được yêu thương.")}
       </p>
-      <p className="signature">Thân mến, anh em KTCNMT ♡</p>
+      <p className="signature">
+        Thân mến, anh em Kỹ thuật công nghệ - Môi trường ♡
+      </p>
       {user && (
         <a className="quiet-button registration-anchor" href="#registration">
           Hẹn gặp nhau nhé ↓
@@ -583,22 +623,24 @@ export default function EventApp() {
         Đến nội dung chính
       </a>
       <header className="app-header">
-        <a href="/" className="brand" aria-label="KTCNMT mừng ngày 20 tháng 10">
+        <a
+          href="/"
+          className="brand"
+          aria-label="Kỹ thuật công nghệ - Môi trường mừng ngày 20 tháng 10"
+        >
           <img src="/acv-logo.png" alt="ACV" width="46" height="46" />
           <span>
-            KTCNMT<small>Mừng ngày Phụ nữ Việt Nam</small>
+            Kỹ thuật công nghệ - Môi trường
+            <small>Mừng ngày Phụ nữ Việt Nam</small>
           </span>
         </a>
         {user && (
           <button
             type="button"
             className="quiet-button account"
-            aria-label="Đổi thành viên"
+            aria-label={`Profile của ${user.fullName}`}
             disabled={saving || gamePending || !!pendingLike}
-            onClick={() => {
-              if (dirty.current) setLogoutConfirm(true);
-              else void logout();
-            }}
+            onClick={accountClick}
           >
             <MemberAvatar
               id={user.id}
@@ -606,10 +648,13 @@ export default function EventApp() {
               gender={user.gender}
               size="sm"
             />
-            <span>Đổi thành viên</span>
           </button>
         )}
       </header>
+      {user?.gender === "female" && (
+        <FlowerWelcome key={user.id} memberId={user.id} />
+      )}
+      {!presentation && <EventCountdown />}
       <div className="page-heading">
         <div>
           <h1 ref={titleRef} tabIndex={-1} id="main-content">
@@ -619,7 +664,9 @@ export default function EventApp() {
                 : "Tháng Mười, có bạn thật vui."
               : tab === "wall"
                 ? "Những lời chúc gửi trao"
-                : "Một chút vui cùng nhau"}
+                : tab === "messages"
+                  ? "Một lời nhắn dành riêng"
+                  : "Một chút vui cùng nhau"}
           </h1>
         </div>
         <p className="connection" role="status">
@@ -1091,7 +1138,7 @@ export default function EventApp() {
                         />
                       )}
                       <div>
-                        <strong>{item.authorName}</strong>
+                        <strong>{author?.shortName || item.authorName}</strong>
                         <p className="hint">{dateTime(item.createdAt)}</p>
                       </div>
                     </div>
@@ -1101,7 +1148,7 @@ export default function EventApp() {
                       type="button"
                       disabled={!user || !!pendingLike}
                       onClick={() => void like(item.id)}
-                      aria-label={`Thả tim lời chúc của ${item.authorName}, ${item.likes} lượt tim`}
+                      aria-label={`Thả tim lời chúc của ${author?.shortName || item.authorName}, ${item.likes} lượt tim`}
                     >
                       <Heart aria-hidden="true" />
                       {item.likes} <span>lượt tim</span>
@@ -1137,7 +1184,10 @@ export default function EventApp() {
               </>
             )}
             {game.phase === "WAITING" ? (
-              <MemoryGame />
+              <MemoryGame
+                key={user?.id || "guest"}
+                memberId={user?.id || null}
+              />
             ) : game.phase === "COMPLETED" ? (
               <div className="empty-state">
                 <Heart aria-hidden="true" />
@@ -1287,7 +1337,12 @@ export default function EventApp() {
                           }
                         </p>
                         {box.assignedMaleName && (
-                          <p>Người đồng hành: {box.assignedMaleName}</p>
+                          <p>
+                            Người đồng hành:{" "}
+                            {STAFF_MEMBERS.find(
+                              (m) => m.id === box.assignedMaleId,
+                            )?.shortName || box.assignedMaleName}
+                          </p>
                         )}
                       </article>
                     ))}
@@ -1297,7 +1352,7 @@ export default function EventApp() {
           </section>
           {session.isAdmin && !presentation && (
             <section className="card host-panel">
-              <p className="eyebrow">Anh Dương giữ nhịp buổi vui</p>
+              <p className="eyebrow">Huy Dương giữ nhịp buổi vui</p>
               <h2>Điều khiển chương trình</h2>
               <p className="muted">
                 Kiểm tra người tham dự thực tế và đủ quà trước khi bắt đầu. Chỉ
@@ -1390,34 +1445,64 @@ export default function EventApp() {
           )}
         </div>
       )}
-      {logoutConfirm && (
-        <section
-          className="draft-confirm card"
-          role="alert"
-          aria-label="Thay đổi chưa lưu"
-        >
-          <h2>Bạn đang có thay đổi chưa lưu</h2>
-          <p>
-            Lưu lựa chọn trước khi đổi thành viên, hoặc bỏ các thay đổi đang
-            nhập.
-          </p>
-          <button
-            className="primary-button"
-            type="button"
-            onClick={() => setLogoutConfirm(false)}
-          >
-            Tiếp tục chỉnh sửa
-          </button>
-          <button
-            className="quiet-button"
-            type="button"
-            disabled={saving || gamePending || !!pendingLike}
-            onClick={() => void logout()}
-          >
-            Bỏ thay đổi & đổi thành viên
-          </button>
-        </section>
+      {user ? (
+        <PrivateInbox
+          key={user.id}
+          memberId={user.id}
+          active={tab === "messages"}
+          onUnread={setUnreadMessages}
+          onDirty={onInboxDirty}
+        />
+      ) : (
+        tab === "messages" && (
+          <section className="card empty-state">
+            <Mail aria-hidden="true" />
+            <h2>Mở hộp thư của bạn</h2>
+            <p>Chọn ảnh của mình để gửi và đọc lời nhắn riêng nhé.</p>
+            <button
+              type="button"
+              className="primary-button"
+              onClick={() => navigate("personal")}
+            >
+              Chọn ảnh của mình →
+            </button>
+          </section>
+        )
       )}
+      <dialog
+        ref={logoutDialog}
+        className="draft-confirm card"
+        aria-labelledby="switch-title"
+        onCancel={() => setLogoutConfirm(false)}
+        onClose={() => setLogoutConfirm(false)}
+      >
+        <h2 id="switch-title">Mở lại danh sách thành viên?</h2>
+        <p>
+          {dirty.current || inboxDirty.current
+            ? "Bạn có nội dung chưa lưu hoặc lời nhắn chưa gửi. Trở lại danh sách sẽ bỏ các bản nháp này."
+            : "Profile đang mở sẽ được đăng xuất khỏi trình duyệt này. Mỗi người hãy chọn đúng ảnh của mình nhé."}
+        </p>
+        {switchError && (
+          <p className="feedback error" role="alert">
+            {switchError}
+          </p>
+        )}
+        <button
+          className="primary-button"
+          type="button"
+          onClick={() => setLogoutConfirm(false)}
+        >
+          Ở lại profile của mình
+        </button>
+        <button
+          className="quiet-button"
+          type="button"
+          disabled={saving || gamePending || !!pendingLike || signingOut}
+          onClick={() => void logout()}
+        >
+          {signingOut ? "Đang đăng xuất…" : "Về danh sách thành viên"}
+        </button>
+      </dialog>
       {!presentation && (
         <nav className="bottom-nav" aria-label="Điều hướng chính">
           {(
@@ -1429,6 +1514,7 @@ export default function EventApp() {
               },
               { id: "wall", label: "Lời chúc", Icon: MessageSquareHeart },
               { id: "game", label: "Trò chơi", Icon: Gift },
+              { id: "messages", label: "Tin riêng", Icon: Mail },
             ] as const
           ).map(({ id, label, Icon }) => (
             <button
@@ -1439,12 +1525,20 @@ export default function EventApp() {
             >
               <Icon aria-hidden="true" />
               <span>{label}</span>
+              {id === "messages" && unreadMessages > 0 && (
+                <b
+                  className="unread-badge"
+                  aria-label={`${unreadMessages} tin chưa đọc`}
+                >
+                  {unreadMessages}
+                </b>
+              )}
             </button>
           ))}
         </nav>
       )}
       <footer>
-        KTCNMT · 20.10.2026
+        Kỹ thuật công nghệ - Môi trường · 20.10.2026
         <span>Một chút thương mến, từ anh em trong phòng.</span>
       </footer>
     </main>

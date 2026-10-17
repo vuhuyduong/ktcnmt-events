@@ -55,6 +55,8 @@ const SIZE_CLASSES: Record<
 
 // Only request portraits that exist. Members without a supplied photo use initials.
 const AVATAR_IMAGES: Record<string, { width: number; height: number }> = {
+  "trung-kien": { width: 384, height: 384 },
+  "huy-duong": { width: 384, height: 384 },
   "quynh-nhu": { width: 384, height: 384 },
   "ngoc-anh": { width: 328, height: 384 },
   "my-dung": { width: 384, height: 384 },
