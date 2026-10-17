@@ -1,14 +1,9 @@
-# System Patterns: KTCNMT 20/10 Event Web App
+# System Patterns: KTCNMT 20/10
 
-## Tech Stack
-- **Framework:** Next.js 14+ (App Router), TypeScript, React 18.
-- **Styling & UI:** Tailwind CSS, `lucide-react`, `canvas-confetti`, CSS keyframes & transitions.
-- **Persistence (Zero-DB Config):**
-  - Single JSON state file at `/app/data/state.json` (mapped via `./data:/app/data` volume in Docker, or `process.cwd() + '/data/state.json'`).
-  - Cached in `globalThis` for fast reads/writes with atomic write-through to disk.
-  - Auto-initialized with sensible default state if `/app/data/state.json` does not exist.
-- **API Routes:**
-  - `GET / POST /api/state`: Manages RSVPs, milk tea pre-orders, wishes, and wish likes.
-  - `GET / POST /api/game`: Manages synchronized Mini-Game state machine (`WAITING`, `SELECTING_BOX`, `SHAKING`, `REVEALED`, `SPINNING_MALE`, `MALE_SELECTED`), host controls, blind box assignments, and male roulette selection.
-- **Smart Avatar Component (`<MemberAvatar />`):**
-  - Loads `/avatars/{id}.jpg` and falls back on error to a glowing gradient circle with 2-letter initials.
+Next.js App Router, TypeScript, React, Tailwind và lucide-react. Cấu hình nội dung sự kiện tập trung tại `EVENT_INFO` trong `src/data/roster.ts`; `RESTAURANT_INFO` chỉ là alias tương thích.
+
+State runtime ở `STATE_FILE_PATH`, production dùng `/app/data/state.json` trên volume `/app/data`. Chạy một instance cho mô hình lưu file. Ghi nguyên tử, không báo thành công khi persist lỗi, không khởi tạo dữ liệu giả khi file hỏng. Source và Docker image loại toàn bộ runtime state/backup/secrets. Khởi tạo mới không có RSVP, đơn, bài chúc hay tim mẫu.
+
+Phiên thành viên được xác thực phía server qua mã mời riêng; admin dùng mã riêng. Không tin memberId, isHost, chọn avatar hoặc localStorage làm quyền. Payload chỉ chứa dữ liệu mà phiên có quyền xem; game không lộ nội dung hộp chưa mở.
+
+`MemberAvatar` chỉ request 11 ảnh WebP có thật trong manifest, khai báo width/height và lazy decoding; ảnh chưa có hoặc tải lỗi dùng initials. Thiết kế và khả năng tiếp cận theo `DESIGN.md`.

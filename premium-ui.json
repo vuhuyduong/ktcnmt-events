@@ -1,0 +1,6 @@
+{
+  "profile": "product-admin",
+  "canonicalMap": "UX-CONTRACT.md",
+  "requiredCapabilities": ["Select/Listbox", "Form"],
+  "ownership": { "Select/Listbox": "native" }
+}

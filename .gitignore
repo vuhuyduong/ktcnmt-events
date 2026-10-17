@@ -13,6 +13,14 @@ yarn-debug.log*
 yarn-error.log*
 .DS_Store
 *.pem
-.env*.local
+.env*
+!.env.example
 .vercel
 *.tsbuildinfo
+
+# Private event runtime, invitation codes, and backup artifacts
+/data/
+/backups/
+/private/
+*.backup.json
+*.bak

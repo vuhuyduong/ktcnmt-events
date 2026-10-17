@@ -1,4 +1,5 @@
 import fs from "fs";
+import { randomInt, randomUUID } from "crypto";
 import path from "path";
 import {
   BLIND_BOX_REWARDS,
@@ -11,6 +12,9 @@ import {
 export interface MemberRsvp {
   memberId: string;
   attending: boolean;
+  attendanceStatus?: "attending" | "declined" | "maybe";
+  dietaryNote?: string;
+  source?: "member-session";
   joinSharedRide1715?: boolean;
   hasPlusOne?: boolean;
   plusOneName?: string;
@@ -34,6 +38,9 @@ export interface WishItem {
   content: string;
   likes: number;
   createdAt: string;
+  requestId?: string;
+  likedBy?: string[];
+  legacyLikes?: number;
 }
 
 export type GamePhase =
@@ -42,7 +49,8 @@ export type GamePhase =
   | "SHAKING"
   | "REVEALED"
   | "SPINNING_MALE"
-  | "MALE_SELECTED";
+  | "MALE_SELECTED"
+  | "COMPLETED";
 
 export interface BlindBoxSlot {
   boxNumber: number;
@@ -74,6 +82,8 @@ export interface GameState {
   selectedMaleId: string | null;
   boxes: BlindBoxSlot[];
   updatedAt: number;
+  participants?: QueenParticipant[];
+  skippedQueenIds?: string[];
 }
 
 export interface AppStateData {
@@ -89,35 +99,26 @@ declare global {
 }
 
 function resolveStateFilePath(): string {
-  const dockerDataDir = "/app/data";
-  try {
-    if (fs.existsSync("/app")) {
-      if (!fs.existsSync(dockerDataDir)) {
-        fs.mkdirSync(dockerDataDir, { recursive: true });
-      }
-      return path.join(dockerDataDir, "state.json");
-    }
-  } catch {
-    // Fallback to local cwd data directory if /app is not accessible
-  }
-  const localDataDir = path.join(process.cwd(), "data");
-  if (!fs.existsSync(localDataDir)) {
-    fs.mkdirSync(localDataDir, { recursive: true });
-  }
-  return path.join(localDataDir, "state.json");
+  return (
+    process.env.STATE_FILE_PATH ||
+    path.join(process.cwd(), "data", "state.json")
+  );
 }
 
 function shuffleArray<T>(items: T[]): T[] {
   const arr = [...items];
   for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = randomInt(i + 1);
     [arr[i], arr[j]] = [arr[j], arr[i]];
   }
   return arr;
 }
 
 export function getDynamicQueens(state: AppStateData): QueenParticipant[] {
-  const staffQueens: QueenParticipant[] = FEMALE_MEMBERS.map((f) => ({
+  if (state.gameState?.participants) return state.gameState.participants;
+  const staffQueens: QueenParticipant[] = FEMALE_MEMBERS.filter(
+    (f) => state.rsvps[f.id]?.attendanceStatus === "attending",
+  ).map((f) => ({
     id: f.id,
     shortName: f.shortName,
     fullName: f.fullName,
@@ -127,9 +128,9 @@ export function getDynamicQueens(state: AppStateData): QueenParticipant[] {
   const guestQueens: QueenParticipant[] = [];
   for (const male of MALE_MEMBERS) {
     const rsvp = state.rsvps[male.id];
-    if (rsvp?.attending && rsvp?.hasPlusOne) {
+    if (rsvp?.attendanceStatus === "attending" && rsvp?.hasPlusOne) {
       const customName = rsvp.plusOneName?.trim();
-      const shortName = customName || `Bà xã ${male.shortName}`;
+      const shortName = customName || `Khách của ${male.shortName}`;
       guestQueens.push({
         id: `guest-${male.id}`,
         shortName,
@@ -144,9 +145,12 @@ export function getDynamicQueens(state: AppStateData): QueenParticipant[] {
   return [...staffQueens, ...guestQueens];
 }
 
-export function createInitialBoxes(boxCount = 7): BlindBoxSlot[] {
+export function createInitialBoxes(boxCount = 0): BlindBoxSlot[] {
   const shuffledRewards = shuffleArray(BLIND_BOX_REWARDS);
-  const count = Math.max(5, Math.min(boxCount, BLIND_BOX_REWARDS.length));
+  const count = Math.max(
+    0,
+    Math.min(boxCount, FEMALE_MEMBERS.length + MALE_MEMBERS.length),
+  );
   return Array.from({ length: count }, (_, index) => ({
     boxNumber: index + 1,
     rewardId: shuffledRewards[index % shuffledRewards.length].id,
@@ -159,13 +163,13 @@ export function createInitialBoxes(boxCount = 7): BlindBoxSlot[] {
   }));
 }
 
-export function createDefaultGameState(boxCount = 7): GameState {
+export function createDefaultGameState(boxCount = 0): GameState {
   return {
     isLive: false,
     focusTimestamp: 0,
     phase: "WAITING",
     phaseStartedAt: Date.now(),
-    currentQueenId: FEMALE_MEMBERS[0].id,
+    currentQueenId: "",
     activeBoxNumber: null,
     selectedMaleId: null,
     boxes: createInitialBoxes(boxCount),
@@ -174,56 +178,17 @@ export function createDefaultGameState(boxCount = 7): GameState {
 }
 
 export function createDefaultState(): AppStateData {
-  const nowIso = new Date().toISOString();
-  const defaultRsvps: Record<string, MemberRsvp> = {
-    "huy-duong": {
-      memberId: "huy-duong",
-      attending: true,
-      hasPlusOne: false,
-      plusOneName: "",
-      transportOption: "vanguard",
-      updatedAt: nowIso,
-    },
-    "anh-thai": {
-      memberId: "anh-thai",
-      attending: true,
-      hasPlusOne: true,
-      plusOneName: "Bà xã Anh Thái",
-      transportOption: "car",
-      updatedAt: nowIso,
-    },
-    "manh-cuong": {
-      memberId: "manh-cuong",
-      attending: true,
-      hasPlusOne: true,
-      plusOneName: "Bà xã Anh Cường",
-      transportOption: "grab",
-      updatedAt: nowIso,
-    },
-  };
-
-  // 5 female staff + 2 wives (Thái & Cường) = 7 boxes by default
   return {
-    rsvps: defaultRsvps,
+    rsvps: {},
     milkTeaOrders: {},
-    wishes: [
-      {
-        id: "wish-seed-1",
-        authorId: "huy-duong",
-        authorName: "Anh Dương",
-        content:
-          "Chúc 05 bông hoa KTCNMT và các chị khách quý dịp 20/10 luôn trẻ trung, rạng rỡ, ngập tràn niềm vui và có một đêm tiệc thật bùng nổ tại The Street! 🌸🥂",
-        likes: 8,
-        createdAt: nowIso,
-      },
-    ],
-    gameState: createDefaultGameState(7),
+    wishes: [],
+    gameState: createDefaultGameState(),
   };
 }
 
 export function getQueenDisplayName(
   queenId: string,
-  state: AppStateData
+  state: AppStateData,
 ): string {
   const queens = getDynamicQueens(state);
   const found = queens.find((q) => q.id === queenId);
@@ -233,92 +198,35 @@ export function getQueenDisplayName(
 }
 
 function persistStateToDisk(state: AppStateData): void {
+  const filePath = resolveStateFilePath();
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  const tempPath = `${filePath}.${randomUUID()}.tmp`;
+  let descriptor: number | undefined;
   try {
-    const filePath = resolveStateFilePath();
-    const tempPath = `${filePath}.tmp`;
-    fs.writeFileSync(tempPath, JSON.stringify(state, null, 2), "utf-8");
+    descriptor = fs.openSync(tempPath, "wx", 0o600);
+    fs.writeFileSync(descriptor, JSON.stringify(state, null, 2), "utf-8");
+    fs.fsyncSync(descriptor);
+    fs.closeSync(descriptor);
+    descriptor = undefined;
     fs.renameSync(tempPath, filePath);
-  } catch (err) {
-    console.error("Failed to write state.json:", err);
+  } finally {
+    if (descriptor !== undefined) fs.closeSync(descriptor);
+    if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
   }
 }
 
 export function syncBoxesWithQueens(state: AppStateData): boolean {
   const game = state.gameState;
+  if (game.participants || game.phase !== "WAITING") return false;
   const queens = getDynamicQueens(state);
-  const targetCount = Math.max(
-    FEMALE_MEMBERS.length,
-    Math.min(queens.length, BLIND_BOX_REWARDS.length)
-  );
-  let mutated = false;
-
-  // 1. Update display names on already-opened boxes if a guest's name changed
-  for (const box of game.boxes) {
-    if (box.openedByQueenId) {
-      const q = queens.find((item) => item.id === box.openedByQueenId);
-      if (q && box.openedByQueenName !== q.shortName) {
-        box.openedByQueenName = q.shortName;
-        mutated = true;
-      }
-    }
-  }
-
-  // 2. Grow boxes if more male members registered +1 guests
-  if (game.boxes.length < targetCount) {
-    const usedRewardIds = new Set(game.boxes.map((b) => b.rewardId));
-    const availableRewards = shuffleArray(
-      BLIND_BOX_REWARDS.filter((r) => !usedRewardIds.has(r.id))
-    );
-    while (game.boxes.length < targetCount) {
-      const nextNum = game.boxes.length + 1;
-      const nextReward =
-        availableRewards.pop() ||
-        BLIND_BOX_REWARDS[(nextNum - 1) % BLIND_BOX_REWARDS.length];
-      game.boxes.push({
-        boxNumber: nextNum,
-        rewardId: nextReward.id,
-        isOpened: false,
-        openedByQueenId: null,
-        openedByQueenName: null,
-        assignedMaleId: null,
-        assignedMaleName: null,
-        openedAt: null,
-      });
-      mutated = true;
-    }
-  }
-
-  // 3. Shrink unopened boxes if a male member turned off +1
-  if (game.boxes.length > targetCount) {
-    const removableCount = game.boxes.length - targetCount;
-    let removed = 0;
-    for (let i = game.boxes.length - 1; i >= 0 && removed < removableCount; i--) {
-      if (!game.boxes[i].isOpened && game.boxes[i].boxNumber !== game.activeBoxNumber) {
-        game.boxes.splice(i, 1);
-        removed++;
-        mutated = true;
-      }
-    }
-    if (removed > 0) {
-      game.boxes.forEach((b, idx) => {
-        b.boxNumber = idx + 1;
-      });
-    }
-  }
-
-  // 4. Ensure currentQueenId is valid
-  if (!queens.some((q) => q.id === game.currentQueenId)) {
-    const openedQueens = new Set(
-      game.boxes
-        .map((b) => b.openedByQueenId)
-        .filter((id): id is string => Boolean(id))
-    );
-    const nextUnopenedQueen = queens.find((q) => !openedQueens.has(q.id));
-    game.currentQueenId = (nextUnopenedQueen || queens[0]).id;
-    mutated = true;
-  }
-
-  return mutated;
+  if (
+    game.boxes.length === queens.length &&
+    (queens.some((q) => q.id === game.currentQueenId) || !queens.length)
+  )
+    return false;
+  game.boxes = createInitialBoxes(queens.length);
+  game.currentQueenId = queens[0]?.id || "";
+  return true;
 }
 
 export function syncGameTimers(state: AppStateData): boolean {
@@ -331,62 +239,173 @@ export function syncGameTimers(state: AppStateData): boolean {
     game.phaseStartedAt = now;
     game.updatedAt = now;
     mutated = true;
-  } else if (game.phase === "SPINNING_MALE" && now - game.phaseStartedAt >= 2500) {
+  } else if (
+    game.phase === "SPINNING_MALE" &&
+    now - game.phaseStartedAt >= 2500
+  ) {
     game.phase = "MALE_SELECTED";
     game.phaseStartedAt = now;
     game.updatedAt = now;
     mutated = true;
   }
 
-  if (mutated) {
-    persistStateToDisk(state);
-  }
   return mutated;
 }
 
-export function getState(): AppStateData {
+function readStateFromDisk(): AppStateData {
   const filePath = resolveStateFilePath();
-
-  if (!globalThis.__ktcnmtStateCache) {
-    if (fs.existsSync(filePath)) {
-      try {
-        const raw = fs.readFileSync(filePath, "utf-8");
-        const parsed = JSON.parse(raw) as Partial<AppStateData>;
-        const defaults = createDefaultState();
-        globalThis.__ktcnmtStateCache = {
-          rsvps: parsed.rsvps ?? defaults.rsvps,
-          milkTeaOrders: parsed.milkTeaOrders ?? defaults.milkTeaOrders,
-          wishes: Array.isArray(parsed.wishes) ? parsed.wishes : defaults.wishes,
-          gameState:
-            parsed.gameState && Array.isArray(parsed.gameState.boxes)
-              ? parsed.gameState
-              : defaults.gameState,
-        };
-      } catch (err) {
-        console.error("Error parsing state.json, re-initializing default:", err);
-        const initial = createDefaultState();
-        globalThis.__ktcnmtStateCache = initial;
-        persistStateToDisk(initial);
-      }
-    } else {
-      const initial = createDefaultState();
-      globalThis.__ktcnmtStateCache = initial;
-      persistStateToDisk(initial);
-    }
+  if (!fs.existsSync(/* turbopackIgnore: true */ filePath)) {
+    const initial = createDefaultState();
+    persistStateToDisk(initial);
+    return initial;
   }
-
-  const state = globalThis.__ktcnmtStateCache;
-  syncGameTimers(state);
-  return state;
+  let parsed: AppStateData;
+  try {
+    parsed = JSON.parse(
+      fs.readFileSync(/* turbopackIgnore: true */ filePath, "utf-8"),
+    ) as AppStateData;
+  } catch {
+    throw new Error(
+      "Invalid persisted state JSON; restore a verified backup before continuing",
+    );
+  }
+  if (
+    !parsed ||
+    typeof parsed.rsvps !== "object" ||
+    !parsed.rsvps ||
+    Array.isArray(parsed.rsvps) ||
+    typeof parsed.milkTeaOrders !== "object" ||
+    !parsed.milkTeaOrders ||
+    Array.isArray(parsed.milkTeaOrders) ||
+    !Array.isArray(parsed.wishes) ||
+    !parsed.gameState ||
+    !Array.isArray(parsed.gameState.boxes) ||
+    ![
+      "WAITING",
+      "SELECTING_BOX",
+      "SHAKING",
+      "REVEALED",
+      "SPINNING_MALE",
+      "MALE_SELECTED",
+      "COMPLETED",
+    ].includes(parsed.gameState.phase)
+  ) {
+    throw new Error(
+      "Invalid persisted state; restore a verified backup before continuing",
+    );
+  }
+  const record = (value: unknown): value is Record<string, unknown> =>
+    Boolean(value && typeof value === "object" && !Array.isArray(value));
+  const strings = (value: Record<string, unknown>, keys: string[]) =>
+    keys.every((key) => typeof value[key] === "string");
+  const validMemberId = (id: string) =>
+    STAFF_MEMBERS.some((member) => member.id === id);
+  const invalidRsvp = Object.entries(parsed.rsvps).some(
+    ([id, value]) =>
+      !validMemberId(id) ||
+      !record(value) ||
+      value.memberId !== id ||
+      typeof value.attending !== "boolean" ||
+      !strings(value, ["updatedAt"]) ||
+      (value.attendanceStatus !== undefined &&
+        !["attending", "declined", "maybe"].includes(
+          String(value.attendanceStatus),
+        )),
+  );
+  const invalidOrder = Object.entries(parsed.milkTeaOrders).some(
+    ([id, value]) =>
+      !validMemberId(id) ||
+      !record(value) ||
+      value.memberId !== id ||
+      !strings(value, ["drinkName", "sugar", "ice", "note", "updatedAt"]),
+  );
+  const invalidWish = parsed.wishes.some(
+    (value) =>
+      !record(value) ||
+      !strings(value, [
+        "id",
+        "authorId",
+        "authorName",
+        "content",
+        "createdAt",
+      ]) ||
+      !Number.isInteger(value.likes) ||
+      Number(value.likes) < 0 ||
+      (value.likedBy !== undefined &&
+        (!Array.isArray(value.likedBy) ||
+          value.likedBy.some(
+            (id) => typeof id !== "string" || !validMemberId(id),
+          ))),
+  );
+  const game = parsed.gameState;
+  const invalidBox = game.boxes.some(
+    (value) =>
+      !record(value) ||
+      !Number.isInteger(value.boxNumber) ||
+      Number(value.boxNumber) < 1 ||
+      !strings(value, ["rewardId"]) ||
+      !BLIND_BOX_REWARDS.some((reward) => reward.id === value.rewardId) ||
+      typeof value.isOpened !== "boolean",
+  );
+  const invalidParticipants =
+    game.participants !== undefined &&
+    (!Array.isArray(game.participants) ||
+      game.participants.some(
+        (value) =>
+          !record(value) ||
+          !strings(value, ["id", "shortName", "fullName"]) ||
+          typeof value.isGuest !== "boolean",
+      ));
+  if (
+    invalidRsvp ||
+    invalidOrder ||
+    invalidWish ||
+    invalidBox ||
+    invalidParticipants ||
+    typeof game.isLive !== "boolean" ||
+    typeof game.currentQueenId !== "string" ||
+    !Number.isFinite(game.phaseStartedAt) ||
+    !Number.isFinite(game.updatedAt)
+  ) {
+    throw new Error(
+      "Invalid persisted state; restore a verified backup before continuing",
+    );
+  }
+  if (parsed.wishes.some((w) => w.id.startsWith("wish-seed-"))) {
+    // Preserve the exact source before the narrowly scoped, known-seed migration.
+    fs.copyFileSync(
+      filePath,
+      `${filePath}.before-seed-removal-${randomUUID()}.bak`,
+      fs.constants.COPYFILE_EXCL,
+    );
+    parsed.wishes = parsed.wishes.filter((w) => !w.id.startsWith("wish-seed-"));
+    persistStateToDisk(parsed);
+  }
+  return parsed;
 }
 
-export function updateState(mutator: (draft: AppStateData) => void): AppStateData {
-  const current = getState();
-  mutator(current);
-  syncGameTimers(current);
-  globalThis.__ktcnmtStateCache = current;
-  persistStateToDisk(current);
-  return current;
+export function getState(): AppStateData {
+  const current = globalThis.__ktcnmtStateCache || readStateFromDisk();
+  const draft = structuredClone(current);
+  if (syncGameTimers(draft)) {
+    persistStateToDisk(draft);
+    globalThis.__ktcnmtStateCache = draft;
+  } else {
+    globalThis.__ktcnmtStateCache = current;
+  }
+  // Callers cannot mutate cached state without a successful updateState commit.
+  return structuredClone(globalThis.__ktcnmtStateCache);
+}
+
+export function updateState(
+  mutator: (draft: AppStateData) => void,
+): AppStateData {
+  const draft = getState();
+  mutator(draft);
+  syncGameTimers(draft);
+  persistStateToDisk(draft);
+  globalThis.__ktcnmtStateCache = draft;
+  return structuredClone(draft);
 }
 
 export function pickRandomMaleForGame(state: AppStateData): {
@@ -396,11 +415,21 @@ export function pickRandomMaleForGame(state: AppStateData): {
   const alreadyAssignedIds = new Set(
     state.gameState.boxes
       .map((b) => b.assignedMaleId)
-      .filter((id): id is string => Boolean(id))
+      .filter((id): id is string => Boolean(id)),
   );
-  const unassignedMales = MALE_MEMBERS.filter((m) => !alreadyAssignedIds.has(m.id));
-  const pool = unassignedMales.length > 0 ? unassignedMales : MALE_MEMBERS;
-  const chosen = pool[Math.floor(Math.random() * pool.length)];
+  const unassignedMales = MALE_MEMBERS.filter(
+    (m) =>
+      state.rsvps[m.id]?.attendanceStatus === "attending" &&
+      !alreadyAssignedIds.has(m.id),
+  );
+  const pool =
+    unassignedMales.length > 0
+      ? unassignedMales
+      : MALE_MEMBERS.filter(
+          (m) => state.rsvps[m.id]?.attendanceStatus === "attending",
+        );
+  if (!pool.length) throw new Error("No attending male participant");
+  const chosen = pool[randomInt(pool.length)];
   return {
     id: chosen.id,
     shortName: chosen.shortName,

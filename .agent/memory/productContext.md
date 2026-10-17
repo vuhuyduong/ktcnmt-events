@@ -1,11 +1,9 @@
-# Product Context: KTCNMT 20/10 Event Web App
+# Product Context: KTCNMT 20/10
 
-## Target Users
-- **05 Female Members ("05 Bông Hoa KTCNMT"):** Quỳnh Như, Ngọc Ánh, Mỹ Dung, Quỳnh Nga, Mộng Băng.
-- **08 Male Members ("08 Anh Em KTCNMT"):** Anh Kiên, Anh Dương (Host), Anh Thái, Anh Cường, Văn Thuận, Bá Kiên, Gia Khang, Hải Minh.
-- **01 Special Guest (+1):** Spouse/partner accompanying a male member (total 14 attendees at the dinner table).
+Người dùng là các thành viên KTCNMT được mời; khách đi cùng chỉ xuất hiện sau đăng ký thực tế. Tên và ảnh tạo sự gần gũi; không hiển thị chức danh hay suy luận tính cách từ ảnh, tuổi hoặc giới tính.
 
-## Key Experience Principles
-- **Equal & Warm Atmosphere:** Never display job titles or positions anywhere in the UI; only display avatars and friendly names (`shortName` / `fullName`).
-- **Tech-Luxury Evening Party Aesthetic:** Dark Rose-Gold & Warm Amber palette (`from-slate-950 via-rose-950/90 to-slate-900`), glassmorphism cards (`bg-white/10 backdrop-blur-md border border-white/15 rounded-2xl shadow-xl`), mobile-first `max-w-md mx-auto` shell, minimum `44px` touch targets with `active:scale-95`.
-- **Frictionless Identity & Secret Reset:** Netflix-style Avatar Picker on first visit saved to `localStorage` (`ktcnmt_user_id`), with a hidden Triple-Tap gesture ($\le 800\text{ms}$) on the top-right header avatar to reset user selection.
+Trải nghiệm ưu tiên được trân trọng, được lựa chọn và được chăm sóc: có thể vắng tiệc, không dùng đồ uống, tự di chuyển hoặc bỏ qua thử thách mà không cần nêu lý do. Ảnh/quay/chia sẻ cần đồng ý; không phạt uống rượu.
+
+Thiệp là nội dung biên tập, tường là hoạt động thực tế. Mọi số liệu phải có nguồn thật. `EVENT_INFO` là nguồn thông tin sự kiện duy nhất; điều chưa chốt ghi “Chưa công bố”.
+
+Thiết kế đã duyệt được ghi trong `DESIGN.md`: navy tối, hồng ấm, xanh dịu, font hệ thống dễ đọc, mobile ưu tiên đăng ký và desktop tối đa 1120px. Chọn avatar không cấp quyền; dùng mã mời và phiên được server xác thực. Cung cấp thao tác đổi thành viên rõ ràng.

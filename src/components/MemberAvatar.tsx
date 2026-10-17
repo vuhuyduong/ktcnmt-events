@@ -53,20 +53,20 @@ const SIZE_CLASSES: Record<
   },
 };
 
-const FEMALE_GRADIENTS = [
-  "from-rose-500 via-pink-500 to-amber-400",
-  "from-fuchsia-500 via-rose-400 to-amber-300",
-  "from-pink-500 via-rose-500 to-orange-300",
-  "from-rose-600 via-pink-400 to-yellow-300",
-  "from-purple-500 via-pink-500 to-amber-300",
-];
-
-const MALE_GRADIENTS = [
-  "from-amber-500 via-orange-500 to-yellow-500",
-  "from-slate-700 via-amber-600 to-orange-400",
-  "from-orange-500 via-amber-500 to-yellow-400",
-  "from-amber-600 via-orange-500 to-amber-300",
-];
+// Only request portraits that exist. Members without a supplied photo use initials.
+const AVATAR_IMAGES: Record<string, { width: number; height: number }> = {
+  "quynh-nhu": { width: 384, height: 384 },
+  "ngoc-anh": { width: 328, height: 384 },
+  "my-dung": { width: 384, height: 384 },
+  "quynh-nga": { width: 381, height: 384 },
+  "mong-bang": { width: 288, height: 384 },
+  "anh-thai": { width: 364, height: 384 },
+  "manh-cuong": { width: 288, height: 384 },
+  "van-thuan": { width: 384, height: 381 },
+  "ba-kien": { width: 256, height: 384 },
+  "gia-khang": { width: 256, height: 384 },
+  "hai-minh": { width: 254, height: 384 },
+};
 
 const AVATAR_FOCUS_CLASSES: Record<string, string> = {
   "quynh-nhu": "object-cover object-[center_22%]",
@@ -95,14 +95,6 @@ export function getInitials(name: string, fullName?: string): string {
   return `${secondLast}${last}`.toUpperCase();
 }
 
-function hashId(id: string): number {
-  let h = 0;
-  for (let i = 0; i < id.length; i++) {
-    h = (h * 31 + id.charCodeAt(i)) >>> 0;
-  }
-  return h;
-}
-
 export const MemberAvatar: React.FC<MemberAvatarProps> = ({
   id,
   name,
@@ -121,21 +113,14 @@ export const MemberAvatar: React.FC<MemberAvatarProps> = ({
 
   const sizeCfg = SIZE_CLASSES[size];
   const initials = getInitials(name, fullName);
-  const hash = hashId(id);
-
-  const bgGradient =
+  const portrait = AVATAR_IMAGES[id];
+  const initialColors =
     gender === "female"
-      ? FEMALE_GRADIENTS[hash % FEMALE_GRADIENTS.length]
-      : MALE_GRADIENTS[hash % MALE_GRADIENTS.length];
-
-  const ringClass =
-    gender === "female"
-      ? highlight
-        ? "p-[3px] bg-gradient-to-tr from-rose-400 via-pink-200 to-amber-200 shadow-[0_0_24px_rgba(251,113,133,0.65)]"
-        : "p-[2.5px] bg-gradient-to-tr from-rose-400 via-pink-300 to-amber-200 shadow-[0_0_16px_rgba(251,113,133,0.4)]"
-      : highlight
-      ? "p-[3px] bg-gradient-to-tr from-amber-300 via-orange-400 to-yellow-200 shadow-[0_0_24px_rgba(251,191,36,0.65)]"
-      : "p-[2px] bg-gradient-to-tr from-amber-400/90 via-orange-300/80 to-slate-500/80 shadow-[0_0_12px_rgba(251,191,36,0.25)]";
+      ? "bg-[#463344] text-[#f2a7b5]"
+      : "bg-[#29443f] text-[#a7d8c4]";
+  const ringClass = highlight
+    ? "p-[3px] bg-[#f2a7b5]"
+    : "p-[2px] bg-slate-500/60";
 
   const imgFocusClass =
     AVATAR_FOCUS_CLASSES[id] || "object-cover object-center";
@@ -145,18 +130,22 @@ export const MemberAvatar: React.FC<MemberAvatarProps> = ({
       className={`relative inline-flex items-center justify-center rounded-full shrink-0 select-none ${sizeCfg.wrapper} ${ringClass} ${className}`}
     >
       <div className="relative w-full h-full rounded-full overflow-hidden bg-slate-900 flex items-center justify-center">
-        {!imgError ? (
+        {portrait && !imgError ? (
           <img
-            src={`/avatars/${id}.jpg`}
-            alt={name}
+            src={`/avatars/${id}.webp`}
+            width={portrait.width}
+            height={portrait.height}
+            loading="lazy"
+            decoding="async"
+            alt={fullName || name}
             onError={() => setImgError(true)}
             className={`w-full h-full rounded-full ${imgFocusClass}`}
           />
         ) : (
           <div
-            className={`w-full h-full rounded-full bg-gradient-to-br ${bgGradient} flex items-center justify-center font-bold tracking-wider text-white drop-shadow-sm ${sizeCfg.text}`}
+            className={`w-full h-full rounded-full ${initialColors} flex items-center justify-center font-semibold tracking-wide ${sizeCfg.text}`}
           >
-            <span className="drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]">
+            <span role="img" aria-label={fullName || name}>
               {initials}
             </span>
           </div>
@@ -166,7 +155,7 @@ export const MemberAvatar: React.FC<MemberAvatarProps> = ({
       {checkedIn && (
         <span
           title="Đã xác nhận tham dự"
-          className={`absolute ${sizeCfg.badge} rounded-full bg-emerald-500 border-2 border-slate-950 text-white flex items-center justify-center shadow-[0_0_8px_rgba(16,185,129,0.8)] z-10`}
+          className={`absolute ${sizeCfg.badge} rounded-full bg-[#a7d8c4] border-2 border-[#111827] text-[#111827] flex items-center justify-center z-10`}
         >
           <Check size={sizeCfg.badgeIcon} strokeWidth={3.5} />
         </span>

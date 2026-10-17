@@ -1,12 +1,9 @@
-# Active Context: KTCNMT 20/10 Event Web App
+# Active Context: Audit implementation 17/10/2026
 
-## Current Focus
-Completed ACV favicon & logo integration, updated venue to **The Street (Chi nhánh 9) – 134 Nguyễn Thái Học, P. Bến Thành** at **19h00 ngày 19/10**, and implemented dynamic female attendee & Blind Box scaling (`5 bạn nữ KTCNMT + Vợ/Bạn gái của các bạn nam`, pre-seeded with Vợ Anh Thái & Vợ Anh Cường).
+Đang triển khai các sửa đổi đã được chủ app cho phép từ báo cáo audit UI/UX và độ tin cậy ngày 17/10/2026. Chưa triển khai hoặc thay đổi dữ liệu Railway trong bước chỉnh mã nguồn này.
 
-## Recent Changes
-- **Favicon & ACV Logo:** Generated square favicon ([icon.png](file:///home/antigravity/workspace/ktcnmt-events/src/app/icon.png), [apple-icon.png](file:///home/antigravity/workspace/ktcnmt-events/src/app/apple-icon.png), [favicon.ico](file:///home/antigravity/workspace/ktcnmt-events/public/favicon.ico)) and header badge ([acv-logo.png](file:///home/antigravity/workspace/ktcnmt-events/public/acv-logo.png)) from the uploaded ACV logo.
-- **Event Venue & Time Update:** Updated [roster.ts](file:///home/antigravity/workspace/ktcnmt-events/src/data/roster.ts) and [page.tsx](file:///home/antigravity/workspace/ktcnmt-events/src/app/page.tsx) to **The Street (Chi nhánh 9)**, `19h00 ngày 19/10`, `134 Nguyễn Thái Học, P. Bến Thành`, Google Maps link `https://maps.app.goo.gl/j3tjn4kV7pEUrBmY7`.
-- **Dynamic Female Count & Blind Boxes:** Updated [store.ts](file:///home/antigravity/workspace/ktcnmt-events/src/lib/store.ts), [state/route.ts](file:///home/antigravity/workspace/ktcnmt-events/src/app/api/state/route.ts), and [game/route.ts](file:///home/antigravity/workspace/ktcnmt-events/src/app/api/game/route.ts) with `getDynamicQueens()` and `syncBoxesWithQueens()`. Pre-configured `anh-thai` and `manh-cuong` with `hasPlusOne: true` (default 5 + 2 = 7 chị em & 7 hộp Túi Mù, automatically growing/shrinking as male members toggle `+1`).
+Thông tin chuẩn nằm trong `EVENT_INFO`; không khôi phục lịch/địa điểm cũ hay giờ xe tự suy ra. Không có khách đi cùng mặc định. Số người dự và số hộp phải xuất phát từ đăng ký hợp lệ theo logic hiện hành, không hardcode tổng.
 
-## Next Steps
-- Commit and push changes to GitHub (`origin/main`) for automatic Railway deployment.
+Các trọng tâm: xác thực phiên và phân quyền server; lưu bền trung thực; xử lý trạng thái tải/lỗi/bản nháp; RSVP và đồ uống độc lập; trò chơi đúng lượt, tự nguyện và giữ bí mật quà; chữ dễ đọc và desktop hai cột. Avatar WebP tối đa 384px, không request ảnh thiếu, cho phép zoom và metadata tiếng Việt.
+
+Không commit dữ liệu runtime, mã mời, env hoặc backup. Trước sửa dữ liệu thật cần sao lưu và đối chiếu nguồn từng bản ghi. Tuyệt đối không ghi dump local lên volume live. Xem README để cấu hình volume và mã mời riêng.

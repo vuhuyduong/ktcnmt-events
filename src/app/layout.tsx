@@ -1,10 +1,27 @@
 import type { Metadata, Viewport } from "next";
+import { EVENT_INFO } from "@/data/roster";
 import "./globals.css";
 
+const description = `Lời mời và đăng ký sự kiện 20/10 của KTCNMT: tiệc ${EVENT_INFO.dinner.time} ngày ${EVENT_INFO.dinner.date} tại ${EVENT_INFO.dinner.venue}; đăng ký đồ uống sáng ${EVENT_INFO.drinks.date}.`;
+
 export const metadata: Metadata = {
-  title: "KTCNMT • 20/10 Interactive Event & Live Mini-Game | ACV",
-  description:
-    "Sự kiện kỷ niệm Ngày Phụ nữ Việt Nam (19/10 – 20/10/2026) – Phòng Kỹ thuật Công nghệ Môi trường (KTCNMT) – Tổng công ty Cảng hàng không Việt Nam (ACV)",
+  metadataBase: new URL("https://ltia-ktcnmt.up.railway.app"),
+  title: EVENT_INFO.title,
+  description,
+  robots: { index: false, follow: false },
+  openGraph: {
+    type: "website",
+    locale: "vi_VN",
+    title: EVENT_INFO.title,
+    description,
+    siteName: "KTCNMT",
+    images: [
+      {
+        url: "/acv-logo.png",
+        alt: "Tổng công ty Cảng hàng không Việt Nam (ACV)",
+      },
+    ],
+  },
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },
@@ -17,9 +34,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
-  themeColor: "#0f172a",
+  themeColor: "#111827",
 };
 
 export default function RootLayout({
@@ -29,7 +44,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="vi" className="dark">
-      <body className="min-h-screen bg-gradient-to-br from-slate-950 via-rose-950/90 to-slate-900 text-slate-100">
+      <body className="min-h-screen bg-[#111827] text-[#f8fafc]">
         {children}
       </body>
     </html>
