@@ -1,0 +1,95 @@
+{
+  "rsvps": {
+    "huy-duong": {
+      "memberId": "huy-duong",
+      "attending": true,
+      "hasPlusOne": false,
+      "plusOneName": "",
+      "transportOption": "vanguard",
+      "updatedAt": "2026-10-17T02:38:26.660Z"
+    }
+  },
+  "milkTeaOrders": {},
+  "wishes": [
+    {
+      "id": "wish-seed-1",
+      "authorId": "huy-duong",
+      "authorName": "Anh Dương",
+      "content": "Chúc 05 bông hoa KTCNMT và chị khách quý dịp 20/10 luôn trẻ trung, rạng rỡ, ngập tràn niềm vui và có một đêm tiệc thật bùng nổ tại The Gangs! 🌸🥂",
+      "likes": 8,
+      "createdAt": "2026-10-17T02:38:26.660Z"
+    }
+  ],
+  "gameState": {
+    "isLive": false,
+    "focusTimestamp": 0,
+    "phase": "WAITING",
+    "phaseStartedAt": 1792204706660,
+    "currentQueenId": "quynh-nhu",
+    "activeBoxNumber": null,
+    "selectedMaleId": null,
+    "boxes": [
+      {
+        "boxNumber": 1,
+        "rewardId": "loc-la-05",
+        "isOpened": false,
+        "openedByQueenId": null,
+        "openedByQueenName": null,
+        "assignedMaleId": null,
+        "assignedMaleName": null,
+        "openedAt": null
+      },
+      {
+        "boxNumber": 2,
+        "rewardId": "loc-la-04",
+        "isOpened": false,
+        "openedByQueenId": null,
+        "openedByQueenName": null,
+        "assignedMaleId": null,
+        "assignedMaleName": null,
+        "openedAt": null
+      },
+      {
+        "boxNumber": 3,
+        "rewardId": "loc-la-03",
+        "isOpened": false,
+        "openedByQueenId": null,
+        "openedByQueenName": null,
+        "assignedMaleId": null,
+        "assignedMaleName": null,
+        "openedAt": null
+      },
+      {
+        "boxNumber": 4,
+        "rewardId": "loc-la-02",
+        "isOpened": false,
+        "openedByQueenId": null,
+        "openedByQueenName": null,
+        "assignedMaleId": null,
+        "assignedMaleName": null,
+        "openedAt": null
+      },
+      {
+        "boxNumber": 5,
+        "rewardId": "loc-la-01",
+        "isOpened": false,
+        "openedByQueenId": null,
+        "openedByQueenName": null,
+        "assignedMaleId": null,
+        "assignedMaleName": null,
+        "openedAt": null
+      },
+      {
+        "boxNumber": 6,
+        "rewardId": "loc-la-06",
+        "isOpened": false,
+        "openedByQueenId": null,
+        "openedByQueenName": null,
+        "assignedMaleId": null,
+        "assignedMaleName": null,
+        "openedAt": null
+      }
+    ],
+    "updatedAt": 1792204706660
+  }
+}

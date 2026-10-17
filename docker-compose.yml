@@ -1,0 +1,19 @@
+services:
+  ktcnmt-events:
+    container_name: ktcnmt-events
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: npm run dev
+    ports:
+      - "2010:2010"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+      - ./data:/app/data
+    environment:
+      - NODE_ENV=development
+      - PORT=2010
+      - WATCHPACK_POLLING=true
+    restart: unless-stopped
