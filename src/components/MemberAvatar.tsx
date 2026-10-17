@@ -116,11 +116,9 @@ export const MemberAvatar: React.FC<MemberAvatarProps> = ({
   const portrait = AVATAR_IMAGES[id];
   const initialColors =
     gender === "female"
-      ? "bg-[#463344] text-[#f2a7b5]"
-      : "bg-[#29443f] text-[#a7d8c4]";
-  const ringClass = highlight
-    ? "p-[3px] bg-[#f2a7b5]"
-    : "p-[2px] bg-slate-500/60";
+      ? "bg-[#f3dce0] text-[#733947]"
+      : "bg-[#e3eadd] text-[#365b4c]";
+  const ringClass = highlight ? "p-[3px] bg-[#d88b9b]" : "p-[2px] bg-[#d6c8bf]";
 
   const imgFocusClass =
     AVATAR_FOCUS_CLASSES[id] || "object-cover object-center";
@@ -129,7 +127,7 @@ export const MemberAvatar: React.FC<MemberAvatarProps> = ({
     <div
       className={`relative inline-flex items-center justify-center rounded-full shrink-0 select-none ${sizeCfg.wrapper} ${ringClass} ${className}`}
     >
-      <div className="relative w-full h-full rounded-full overflow-hidden bg-slate-900 flex items-center justify-center">
+      <div className="relative w-full h-full rounded-full overflow-hidden bg-[#f3e6dc] flex items-center justify-center">
         {portrait && !imgError ? (
           <img
             src={`/avatars/${id}.webp`}
@@ -155,7 +153,7 @@ export const MemberAvatar: React.FC<MemberAvatarProps> = ({
       {checkedIn && (
         <span
           title="Đã xác nhận tham dự"
-          className={`absolute ${sizeCfg.badge} rounded-full bg-[#a7d8c4] border-2 border-[#111827] text-[#111827] flex items-center justify-center z-10`}
+          className={`absolute ${sizeCfg.badge} rounded-full bg-[#e3eadd] border-2 border-[#fff8f3] text-[#365b4c] flex items-center justify-center z-10`}
         >
           <Check size={sizeCfg.badgeIcon} strokeWidth={3.5} />
         </span>

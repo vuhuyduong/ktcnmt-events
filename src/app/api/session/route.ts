@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   apiError,
-  authenticate,
+  selectIdentity,
   getSession,
-  isAuthConfigured,
   noStore,
   requestBody,
   requireTrustedOrigin,
@@ -16,7 +15,6 @@ export async function GET(req: NextRequest) {
       ...getSession(req),
       memberId: getSession(req)?.memberId ?? null,
       isAdmin: getSession(req)?.isAdmin ?? false,
-      configured: isAuthConfigured(),
     },
     { headers: noStore },
   );
@@ -24,12 +22,9 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     requireTrustedOrigin(req);
-    const { memberId, inviteCode } = await requestBody(req);
-    const session = authenticate(memberId, inviteCode);
-    const response = NextResponse.json(
-      { ...session, configured: true },
-      { headers: noStore },
-    );
+    const { memberId } = await requestBody(req);
+    const session = selectIdentity(memberId);
+    const response = NextResponse.json(session, { headers: noStore });
     setSessionCookie(response, session);
     return response;
   } catch (error) {
@@ -40,7 +35,7 @@ export async function DELETE(req: NextRequest) {
   try {
     requireTrustedOrigin(req);
     const response = NextResponse.json(
-      { memberId: null, isAdmin: false, configured: isAuthConfigured() },
+      { memberId: null, isAdmin: false },
       { headers: noStore },
     );
     setSessionCookie(response, null);

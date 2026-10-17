@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { EVENT_INFO } from "@/data/roster";
 import "./globals.css";
 
-const description = `Lời mời và đăng ký sự kiện 20/10 của KTCNMT: tiệc ${EVENT_INFO.dinner.time} ngày ${EVENT_INFO.dinner.date} tại ${EVENT_INFO.dinner.venue}; đăng ký đồ uống sáng ${EVENT_INFO.drinks.date}.`;
+const description = `Một buổi hẹn ấm áp cùng KTCNMT. Gặp nhau lúc ${EVENT_INFO.dinner.time} ngày ${EVENT_INFO.dinner.date} tại ${EVENT_INFO.dinner.venue}.`;
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://ltia-ktcnmt.up.railway.app"),
@@ -34,7 +34,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#111827",
+  themeColor: "#fff8f3",
 };
 
 export default function RootLayout({
@@ -43,10 +43,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="vi" className="dark">
-      <body className="min-h-screen bg-[#111827] text-[#f8fafc]">
-        {children}
-      </body>
+    <html lang="vi">
+      <body>{children}</body>
     </html>
   );
 }

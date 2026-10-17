@@ -1,32 +1,32 @@
-# Hướng thiết kế KTCNMT 20/10
+# KTCNMT · Tháng Mười, gửi thương mến
 
-Nguồn quyết định: audit ngày 17/10/2026 đã được duyệt. Trải nghiệm cần ấm áp, rõ ràng và tôn trọng quyền lựa chọn. Ảnh thật, lời nhắn chân thành và thông tin chính xác là điểm nhấn.
+Quyết định mới nhất của chủ ứng dụng ngày 17/10/2026 thay thế hướng audit cũ: một món quà 20/10 thân tình, sáng và ấm, bắt đầu bằng ảnh thật của mọi người. Chạm ảnh mở trang riêng, không mã mời hoặc bước thiết lập quyền.
 
-## Nền tảng hình ảnh
+## Hệ hình ảnh
 
-| Vai trò                      | Màu       |
-| ---------------------------- | --------- |
-| Nền                          | `#111827` |
-| Panel                        | `#202B3C` |
-| Chữ chính                    | `#f8fafc` |
-| Chữ phụ                      | `#cbd5e1` |
-| Hành động / hồng ấm          | `#f2a7b5` |
-| Trạng thái đã lưu / xanh dịu | `#a7d8c4` |
+`src/app/globals.css` sở hữu token và component CSS dùng chung.
 
-Dùng font hệ thống hỗ trợ tiếng Việt, body 16px với line-height khoảng 1.5; nhãn 14px trở lên và input 16px. Nút có vùng chạm tối thiểu 44px, focus bàn phím rõ, trạng thái luôn có chữ đi kèm màu. Cho phép zoom. Tôn trọng reduced-motion cả CSS lẫn JavaScript.
+| Vai trò              | Token        | Màu     |
+| -------------------- | ------------ | ------- |
+| Giấy ngà             | --background | #fff8f3 |
+| Bề mặt               | --panel      | #fffcf8 |
+| Chữ burgundy         | --text       | #542b35 |
+| Chữ phụ              | --muted      | #775e60 |
+| Hoa hồng / hành động | --pink       | #983e55 |
+| Thành công / lá      | --green      | #3f6752 |
 
-## Bố cục và nội dung
+Be Vietnam Pro tự lưu trong `public/fonts`, gồm regular và semibold với bộ ký tự tiếng Việt đầy đủ, giấy phép OFL đi kèm. Heading dùng cùng font, không dùng serif fallback dễ lệch dấu. Body 16px; line-height thoáng, input 16px; nút chạm ít nhất 44px, focus rõ, cho phép zoom và tôn trọng reduced-motion.
 
-Mobile ưu tiên thiệp gọn → thông tin tiệc → đăng ký. Desktop rộng tối đa 1120px, dùng hai cột khi đủ chỗ. Trò chơi ưu tiên tên người đến lượt, quà và hành động hợp lệ. Hạn chế glow, gradient, chữ in hoa và chuyển động trang trí.
+## Bố cục và giọng nói
 
-Cấu hình sự kiện chỉ lấy từ `EVENT_INFO` trong `src/data/roster.ts`. Giữ nguyên thông tin tiệc đã xác nhận; giờ xe, điểm tập trung, chiều về, đầu mối, hạn đăng ký và giờ đồ uống chưa có xác nhận phải ghi “Chưa công bố”. Không tự thêm thực đơn hoặc hứa dịch vụ chưa được xác minh.
+Trang đầu: năm ảnh nữ nổi bật, nhóm anh em phía dưới, lịch hẹn đã xác nhận. Desktop trải ngang; mobile gọn 3+2 ảnh nữ và 4+4 anh em. Chỉ hai người chưa có ảnh dùng initials. Không tạo ảnh giả, tính cách hay kỷ niệm giả.
 
-Thiệp là nội dung biên tập của anh em KTCNMT; không bịa tính cách, kỷ niệm hoặc đóng góp cá nhân. Tường chỉ chứa lời chúc và tương tác thật. Không dùng dữ liệu mẫu, số người online suy diễn hoặc đăng ký mặc định để lấp màn rỗng.
+Trang riêng: ảnh, lời chúc ngắn riêng theo tên từ roster, thiệp hồng ngà, lịch trình và lựa chọn tham dự/di chuyển. Gọi hành động bằng lời hàng ngày: “Hẹn nhau nhé”, “Lưu lựa chọn”, “Đổi thành viên”. Không dùng giọng doanh nghiệp. Lỗi chỉ xuất hiện khi có vấn đề; kết nối bình thường không cần nhãn trạng thái.
 
-Mọi thử thách tự nguyện, có thể đổi hoặc bỏ qua mà không bị phạt. Chụp, quay và chia sẻ ảnh cần sự đồng ý của những người xuất hiện. Không phạt uống rượu hay yêu cầu uống cạn.
+Lịch trình lấy từ `EVENT_INFO`: taxi 17h00 ngày 19/10/2026 từ 2 Sông Đáy đến 134 Nguyễn Thái Học, dự kiến 45–60 phút; tiệc 19h00 tại The Street chi nhánh 9. Không dựng thông tin liên hệ, hạn chốt hoặc các khối chưa công bố. Không hiển thị menu, đặt món hoặc kế hoạch quà chưa được phép công bố.
 
-## Tài sản và bảo mật
+Trò lật thẻ có hoa, lá, tim và KTCNMT, chơi riêng trên máy, không đồng hồ hay bảng thành tích. Trò mở quà chung vẫn do host bắt đầu, giữ bảo vệ lượt và đồng bộ dữ liệu. Mọi thử thách và vai trò đồng hành đều tự nguyện, có thể bỏ qua. Chụp/quay/chia sẻ chỉ khi mọi người đồng ý.
 
-Avatar thật đã có dùng WebP, cạnh dài tối đa 384px và giữ điểm lấy nét. Người chưa có ảnh dùng initials ngay, không gửi request ảnh thiếu. Không tạo ảnh chân dung giả. Logo ACV giữ đúng tỷ lệ.
+## Danh tính và dữ liệu
 
-Chọn avatar chỉ chọn danh tính để đăng nhập; quyền sửa dữ liệu và điều khiển host phải được server xác thực. Ghi chú cá nhân và hậu cần chỉ đến đúng người có quyền. RSVP, đồ uống và phương tiện là các lựa chọn độc lập; không chọn sẵn thành xác nhận thật.
+Chọn ảnh là nhận diện tiện dụng cho nhóm quen biết, không phải xác thực mạnh. Cookie nhớ lựa chọn; host theo `isHost` trong roster, không thêm mã thay thế. Không chọn sẵn câu trả lời thành xác nhận thật. Chỉ hiển thị lời chúc và tương tác thật. Dữ liệu lịch sử giữ nguyên trên disk, bao gồm các trường đã thôi hiển thị; lưu chuyến đi không xóa lựa chọn cũ ngoài phạm vi.

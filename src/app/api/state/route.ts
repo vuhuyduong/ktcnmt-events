@@ -2,9 +2,6 @@ import { randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import {
   STAFF_MEMBERS,
-  MILK_TEA_MENU,
-  SUGAR_LEVELS,
-  ICE_LEVELS,
   MALE_TRANSPORT_OPTIONS,
   MaleTransportOptionId,
 } from "@/data/roster";
@@ -87,38 +84,16 @@ export async function POST(req: NextRequest) {
         | "declined"
         | "maybe";
       const attending = attendanceStatus === "attending";
-      const dietaryNote = text(body.dietaryNote, 500);
       if (member.gender === "female") {
-        const wantsDrink = flag(body.wantsDrink, Boolean(body.drinkName));
         draft.rsvps[member.id] = {
+          ...draft.rsvps[member.id],
           memberId: member.id,
           attending,
           attendanceStatus,
           source: "member-session",
-          dietaryNote,
           joinSharedRide1715: attending && flag(body.joinSharedRide1715),
           updatedAt: nowIso,
         };
-        if (!wantsDrink) delete draft.milkTeaOrders[member.id];
-        else {
-          if (
-            !MILK_TEA_MENU.some((drink) => drink.name === body.drinkName) ||
-            !(SUGAR_LEVELS as readonly string[]).includes(String(body.sugar)) ||
-            !(ICE_LEVELS as readonly string[]).includes(String(body.ice))
-          )
-            throw new ApiError(
-              400,
-              "Vui lòng chọn đồ uống, đường và đá trong menu.",
-            );
-          draft.milkTeaOrders[member.id] = {
-            memberId: member.id,
-            drinkName: String(body.drinkName),
-            sugar: String(body.sugar),
-            ice: String(body.ice),
-            note: text(body.note, 500),
-            updatedAt: nowIso,
-          };
-        }
       } else {
         const hasPlusOne = attending && flag(body.hasPlusOne);
         const transportOption = text(body.transportOption, 40);
@@ -130,12 +105,13 @@ export async function POST(req: NextRequest) {
         )
           throw new ApiError(400, "Phương tiện không hợp lệ.");
         draft.rsvps[member.id] = {
+          ...draft.rsvps[member.id],
           memberId: member.id,
           attending,
           attendanceStatus,
           source: "member-session",
-          dietaryNote,
           hasPlusOne,
+          gameCompanion: attending && flag(body.gameCompanion),
           plusOneName: hasPlusOne ? text(body.plusOneName, 100) : "",
           transportOption:
             attending && transportOption
@@ -147,7 +123,10 @@ export async function POST(req: NextRequest) {
         if (content) {
           const requestId = text(body.requestId, 100);
           if (!requestId)
-            throw new ApiError(400, "Thiếu mã gửi lời chúc. Vui lòng thử lại.");
+            throw new ApiError(
+              400,
+              "Chưa gửi được lời chúc. Bạn thử lưu lại nhé.",
+            );
           if (
             !draft.wishes.some(
               (w) => w.authorId === member.id && w.requestId === requestId,

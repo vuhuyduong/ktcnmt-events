@@ -106,48 +106,6 @@ export const MALE_MEMBERS = STAFF_MEMBERS.filter((m) => m.gender === "male");
 
 export const SPECIAL_GUEST_ID = "guest-plus-one";
 
-export const MILK_TEA_MENU = [
-  {
-    id: "olong-hoang-kim",
-    name: "Trà Ô Long Sữa Trân Châu Hoàng Kim",
-    tag: "Best Seller ✨",
-    icon: "🧋",
-  },
-  {
-    id: "hong-tra-kem-cheese",
-    name: "Hồng Trà Sữa Kem Cheese",
-    tag: "Béo ngậy 🧀",
-    icon: "🥛",
-  },
-  {
-    id: "ba-tuoc-tran-chau-trang",
-    name: "Trà Sữa Bá Tước Trân Châu Trắng",
-    tag: "Thơm dịu 🌸",
-    icon: "🫖",
-  },
-  {
-    id: "olong-dao-cam-sa",
-    name: "Trà Ô Long Đào Cam Sả (Thanh mát)",
-    tag: "Fresh 🍑",
-    icon: "🍹",
-  },
-  {
-    id: "matcha-latte-kem-sua",
-    name: "Matcha Latte Kem Sữa",
-    tag: "Trendy 🍵",
-    icon: "🍵",
-  },
-] as const;
-
-export const SUGAR_LEVELS = [
-  "30% đường",
-  "50% đường",
-  "70% đường",
-  "100% đường",
-] as const;
-
-export const ICE_LEVELS = ["Ít đá", "Đá bình thường"] as const;
-
 export type MaleTransportOptionId = "car" | "grab" | "vanguard" | "self";
 
 export const MALE_TRANSPORT_OPTIONS: {
@@ -156,26 +114,11 @@ export const MALE_TRANSPORT_OPTIONS: {
   shortLabel: string;
 }[] = [
   {
-    id: "car",
-    label: "🚗 Có Ô tô cá nhân (hỗ trợ đón chị em từ cơ quan ra The Street)",
-    shortLabel: "🚗 Có Ô tô cá nhân đón chị em",
-  },
-  {
     id: "grab",
-    label: "🚕 Sẵn sàng ghép GrabCar đi cùng chị em ra quán",
-    shortLabel: "🚕 Ghép GrabCar cùng chị em",
+    label: "Đi taxi cùng chị em và anh em",
+    shortLabel: "Đi taxi cùng nhau",
   },
-  {
-    id: "vanguard",
-    label:
-      "🛵 Đội Tiên phong: Chạy qua The Street trước nhận Hoa tươi & giữ bàn",
-    shortLabel: "🛵 Tiên phong (Nhận hoa & giữ bàn)",
-  },
-  {
-    id: "self",
-    label: "Tự di chuyển, không đăng ký hỗ trợ xe",
-    shortLabel: "Tự di chuyển",
-  },
+  { id: "self", label: "Mình tự di chuyển", shortLabel: "Tự di chuyển" },
 ];
 
 // Gợi ý biên tập để người gửi tự chọn và chỉnh sửa; không phải bài đăng sẵn.
@@ -313,13 +256,14 @@ export const EVENT_INFO = {
     mapsUrl: "https://maps.app.goo.gl/j3tjn4kV7pEUrBmY7",
   },
   sharedRide: {
-    time: "Chưa công bố",
-    meetingPoint: "Chưa công bố",
-    returnPlan: "Chưa công bố",
+    departure: "17h00",
+    time: "17h00 · Thứ Hai, 19/10/2026",
+    meetingPoint: "2 Sông Đáy",
+    destination: "134 Nguyễn Thái Học",
+    estimate: "45–60 phút",
+    mapsUrl:
+      "https://www.google.com/maps/dir/?api=1&origin=2+S%C3%B4ng+%C4%90%C3%A1y,+TP.HCM&destination=134+Nguy%E1%BB%85n+Th%C3%A1i+H%E1%BB%8Dc,+TP.HCM&travelmode=driving",
   },
-  registrationDeadline: "Chưa công bố",
-  contact: "Chưa công bố",
-  drinks: { date: "20/10/2026", time: "Chưa công bố" },
 } as const;
 
 export const RESTAURANT_INFO = {

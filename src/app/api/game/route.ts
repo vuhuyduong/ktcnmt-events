@@ -171,10 +171,14 @@ export async function POST(req: NextRequest) {
         if (game.phase !== "REVEALED") conflict();
         if (
           !MALE_MEMBERS.some(
-            (m) => draft.rsvps[m.id]?.attendanceStatus === "attending",
+            (m) =>
+              draft.rsvps[m.id]?.attendanceStatus === "attending" &&
+              draft.rsvps[m.id]?.gameCompanion === true,
           )
         )
-          conflict("Chưa có người đồng hành xác nhận tham dự.");
+          conflict(
+            "Chưa có anh em nào chọn cùng chơi. Mình có thể bỏ qua phần đồng hành nhé.",
+          );
         const selected = pickRandomMaleForGame(draft);
         const box = game.boxes.find(
           (b) => b.boxNumber === game.activeBoxNumber,

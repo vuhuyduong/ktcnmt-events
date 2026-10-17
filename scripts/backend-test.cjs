@@ -132,33 +132,34 @@ async function main() {
     401,
     "writes require session",
   );
-  process.env.EVENT_SESSION_SECRET =
-    "test-only-signing-secret-which-is-at-least-32-characters";
-  process.env.EVENT_MEMBER_CODES_JSON = JSON.stringify({
-    "quynh-nhu": "nhu-test",
-    "ngoc-anh": "anh-test",
-    "huy-duong": "duong-test",
-  });
-  process.env.EVENT_ADMIN_CODE = "admin-test";
+  delete process.env.EVENT_SESSION_SECRET;
+  delete process.env.EVENT_MEMBER_CODES_JSON;
+  delete process.env.EVENT_ADMIN_CODE;
   const session = require("../src/app/api/session/route.ts");
-  const login = async (memberId, inviteCode) => {
-    const r = await session.POST(req("/api/session", { memberId, inviteCode }));
-    assert.equal(r.status, 200);
+  const login = async (memberId) => {
+    const r = await session.POST(req("/api/session", { memberId }));
+    assert.equal(r.status, 200, "roster choice needs no configuration");
     return r.headers.get("set-cookie").split(";")[0];
   };
-  const nhu = await login("quynh-nhu", "nhu-test");
-  const anh = await login("ngoc-anh", "anh-test");
-  const admin = await login("huy-duong", "admin-test");
+  const nhu = await login("quynh-nhu");
+  const anh = await login("ngoc-anh");
+  const admin = await login("huy-duong");
+  assert.equal(
+    (await session.POST(req("/api/session", { memberId: "unknown" }))).status,
+    400,
+  );
   assert.equal(
     (
-      await session.POST(
-        req("/api/session", {
-          memberId: "quynh-nhu",
-          inviteCode: "admin-test",
-        }),
-      )
-    ).status,
-    401,
+      await (
+        await session.GET(
+          new NextRequest("http://localhost/api/session", {
+            headers: { cookie: admin },
+          }),
+        )
+      ).json()
+    ).isAdmin,
+    true,
+    "host role follows roster",
   );
   assert.equal(
     (
@@ -169,7 +170,6 @@ async function main() {
             action: "SUBMIT_FEMALE_RSVP",
             memberId: "ngoc-anh",
             attendanceStatus: "attending",
-            wantsDrink: false,
           },
           nhu,
         ),
@@ -200,7 +200,7 @@ async function main() {
           ? { "x-forwarded-host": forwarded, "x-forwarded-proto": "https" }
           : {}),
       },
-      body: JSON.stringify({ memberId: "quynh-nhu", inviteCode: "nhu-test" }),
+      body: JSON.stringify({ memberId: "quynh-nhu" }),
     });
   assert.equal(
     (await session.POST(originRequest("https://event.example"))).status,
@@ -218,7 +218,6 @@ async function main() {
     action: "SUBMIT_FEMALE_RSVP",
     memberId: "quynh-nhu",
     attendanceStatus: "attending",
-    wantsDrink: false,
     dietaryNote: "Ăn chay",
   };
   assert.equal((await api.POST(req("/api/state", submit, nhu))).status, 200);
@@ -249,24 +248,6 @@ async function main() {
     "failed API save cannot mutate cached RSVP",
   );
 
-  assert.equal(
-    (
-      await api.POST(
-        req(
-          "/api/state",
-          {
-            ...submit,
-            wantsDrink: true,
-            drinkName: "invalid",
-            sugar: "bad",
-            ice: "bad",
-          },
-          nhu,
-        ),
-      )
-    ).status,
-    400,
-  );
   const ownState = await (
     await api.GET(
       new NextRequest("http://localhost/api/state", {
@@ -274,7 +255,11 @@ async function main() {
       }),
     )
   ).json();
-  assert.equal(ownState.rsvps["quynh-nhu"].dietaryNote, "Ăn chay");
+  assert.equal(
+    ownState.rsvps["quynh-nhu"].dietaryNote,
+    undefined,
+    "retired form fields are not newly accepted",
+  );
   const otherState = await (
     await api.GET(
       new NextRequest("http://localhost/api/state", {
@@ -283,51 +268,44 @@ async function main() {
     )
   ).json();
   assert.deepEqual(otherState.rsvps, {});
-  const roster = require("../src/data/roster.ts");
+  const historicOrder = {
+    memberId: "quynh-nhu",
+    drinkName: "Historical choice",
+    sugar: "50%",
+    ice: "normal",
+    note: "Keep private",
+    updatedAt: new Date().toISOString(),
+  };
+  store.updateState((s) => {
+    s.milkTeaOrders["quynh-nhu"] = historicOrder;
+    s.rsvps["quynh-nhu"].dietaryNote = "Historic note";
+  });
   for (const attendanceStatus of ["attending", "declined", "maybe"]) {
     assert.equal(
       (
         await api.POST(
           req(
             "/api/state",
-            {
-              ...submit,
-              attendanceStatus,
-              wantsDrink: true,
-              drinkName: roster.MILK_TEA_MENU[0].name,
-              sugar: roster.SUGAR_LEVELS[0],
-              ice: roster.ICE_LEVELS[0],
-            },
+            { ...submit, attendanceStatus, joinSharedRide1715: true },
             nhu,
           ),
         )
       ).status,
       200,
+    );
+    assert.deepEqual(
+      store.getState().milkTeaOrders["quynh-nhu"],
+      historicOrder,
+      "travel saves preserve historical orders",
+    );
+    assert.equal(
+      store.getState().rsvps["quynh-nhu"].dietaryNote,
+      "Historic note",
+      "unrelated stored notes survive",
     );
     assert.equal(
       store.getState().rsvps["quynh-nhu"].attending,
       attendanceStatus === "attending",
-    );
-    assert.ok(
-      store.getState().milkTeaOrders["quynh-nhu"],
-      "drink order independent of dinner",
-    );
-    assert.equal(
-      (
-        await api.POST(
-          req(
-            "/api/state",
-            { ...submit, attendanceStatus, wantsDrink: false },
-            nhu,
-          ),
-        )
-      ).status,
-      200,
-    );
-    assert.equal(
-      store.getState().milkTeaOrders["quynh-nhu"],
-      undefined,
-      "no drink removes existing order",
     );
   }
   await api.POST(req("/api/state", submit, nhu));
@@ -335,7 +313,11 @@ async function main() {
     await api.GET(new NextRequest("http://localhost/api/state"))
   ).json();
   assert.deepEqual(publicState.rsvps, {});
-  assert.deepEqual(publicState.milkTeaOrders, {});
+  assert.equal(
+    publicState.milkTeaOrders,
+    undefined,
+    "retired private orders never enter payloads",
+  );
   assert.deepEqual(
     publicState.queens,
     [],
@@ -409,6 +391,7 @@ async function main() {
             action: "SUBMIT_MALE_RSVP",
             memberId: "huy-duong",
             attendanceStatus: "attending",
+            gameCompanion: true,
             requestId: "unique-wish",
             wishContent: "Chúc vui",
           },
@@ -427,6 +410,7 @@ async function main() {
             action: "SUBMIT_MALE_RSVP",
             memberId: "huy-duong",
             attendanceStatus: "attending",
+            gameCompanion: true,
             requestId: "unique-wish",
             wishContent: "Chúc vui",
           },
@@ -624,42 +608,26 @@ async function main() {
   );
   assert.equal(store.getState().gameState.currentQueenId, "ngoc-anh");
   assert.deepEqual(store.getState().gameState.skippedQueenIds, ["quynh-nhu"]);
-  const signed = nhu.split("=")[1];
   assert.equal(
     (
       await api.POST(
         req(
           "/api/state",
           { action: "LIKE_WISH", wishId: "real-wish" },
-          "ktcnmt_session=" + signed.slice(0, -2) + "xx",
+          "ktcnmt_member=unknown",
         ),
       )
     ).status,
     401,
-    "tampered cookie rejected",
-  );
-  const oldSecret = process.env.EVENT_SESSION_SECRET;
-  delete process.env.EVENT_SESSION_SECRET;
-  assert.equal(
-    (
-      await session.POST(
-        req("/api/session", { memberId: "quynh-nhu", inviteCode: "nhu-test" }),
-      )
-    ).status,
-    503,
-    "missing signing key fails closed",
+    "unknown identities rejected",
   );
   assert.equal(
-    (
-      await api.POST(
-        req("/api/state", { action: "LIKE_WISH", wishId: "real-wish" }, nhu),
-      )
-    ).status,
-    401,
+    (await session.POST(req("/api/session", { memberId: "quynh-nhu" }))).status,
+    200,
+    "fresh browser works without environment codes",
   );
-  process.env.EVENT_SESSION_SECRET = oldSecret;
   console.log(
-    "Backend storage, authentication, privacy, RSVP, idempotency and game checks passed.",
+    "Backend storage, roster identity, privacy, RSVP, idempotency and game checks passed.",
   );
 }
 main()

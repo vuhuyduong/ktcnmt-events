@@ -10,21 +10,18 @@ import {
   MapPin,
   MessageSquareHeart,
 } from "lucide-react";
+import MemoryGame from "@/components/MemoryGame";
 import MemberAvatar from "@/components/MemberAvatar";
 import {
   BLIND_BOX_REWARDS,
   EVENT_INFO,
-  ICE_LEVELS,
   MALE_TRANSPORT_OPTIONS,
-  MILK_TEA_MENU,
   RESTAURANT_INFO,
   STAFF_MEMBERS,
-  SUGAR_LEVELS,
 } from "@/data/roster";
 import type {
   GameState,
   MemberRsvp,
-  MilkTeaOrder,
   QueenParticipant,
   WishItem,
 } from "@/lib/store";
@@ -34,23 +31,20 @@ type Attendance = "attending" | "maybe" | "declined" | "";
 type Session = {
   memberId: string | null;
   isAdmin: boolean;
-  configured: boolean;
 };
 type Snapshot = {
   rsvps: Record<string, MemberRsvp>;
-  milkTeaOrders: Record<string, MilkTeaOrder>;
   wishes: WishItem[];
   queens: QueenParticipant[];
   gameState: GameState;
 };
 const attendanceLabels = {
-  attending: "Sẽ tham dự",
-  maybe: "Chưa chắc",
-  declined: "Không tham dự",
+  attending: "Mình sẽ đến",
+  maybe: "Mình cần thu xếp thêm",
+  declined: "Mình không đến được",
 };
 const emptySnapshot: Snapshot = {
   rsvps: {},
-  milkTeaOrders: {},
   wishes: [],
   queens: [],
   gameState: {
@@ -98,25 +92,17 @@ export default function EventApp() {
   const [session, setSession] = useState<Session>({
     memberId: null,
     isAdmin: false,
-    configured: false,
   });
   const [sessionLoaded, setSessionLoaded] = useState(false);
   const [snapshot, setSnapshot] = useState<Snapshot>(emptySnapshot);
   const [loaded, setLoaded] = useState(false);
   const [connection, setConnection] = useState("Đang tải dữ liệu…");
-  const [selectedMember, setSelectedMember] = useState("");
-  const [inviteCode, setInviteCode] = useState("");
   const [signingIn, setSigningIn] = useState(false);
   const [authError, setAuthError] = useState("");
   const [attendance, setAttendance] = useState<Attendance>("");
   const [ride, setRide] = useState("");
-  const [wantsDrink, setWantsDrink] = useState("");
-  const [drink, setDrink] = useState("");
-  const [sugar, setSugar] = useState("");
-  const [ice, setIce] = useState("");
-  const [note, setNote] = useState("");
-  const [dietaryNote, setDietaryNote] = useState("");
   const [plusOne, setPlusOne] = useState(false);
+  const [gameCompanion, setGameCompanion] = useState(false);
   const [plusOneName, setPlusOneName] = useState("");
   const [transport, setTransport] = useState("");
   const [wish, setWish] = useState("");
@@ -142,9 +128,8 @@ export default function EventApp() {
   const titleRef = useRef<HTMLHeadingElement>(null);
   const confettiKey = useRef("");
   const user = STAFF_MEMBERS.find((member) => member.id === session.memberId);
-  const { gameState: game, rsvps, milkTeaOrders, wishes, queens } = snapshot;
+  const { gameState: game, rsvps, wishes, queens } = snapshot;
   const myRsvp = user ? rsvps[user.id] : undefined;
-  const myOrder = user ? milkTeaOrders[user.id] : undefined;
   const currentQueen = queens.find((queen) => queen.id === game.currentQueenId);
   const activeBox = game.boxes.find(
     (box) => box.boxNumber === game.activeBoxNumber,
@@ -177,7 +162,7 @@ export default function EventApp() {
         return;
       apply(data);
       setLoaded(true);
-      setConnection("Đã cập nhật");
+      setConnection("");
     } catch {
       if (sequence === latestRequest.current)
         setConnection("Chưa kết nối được — đang thử lại");
@@ -190,23 +175,7 @@ export default function EventApp() {
       try {
         // Share initialization across Strict Mode effect replays; consume a personal link once.
         if (!initialSessionRequest.current) {
-          const fragment = new URLSearchParams(window.location.hash.slice(1));
-          const memberId = fragment.get("member");
-          const code = fragment.get("code");
-          if (code)
-            window.history.replaceState(
-              null,
-              "",
-              window.location.pathname + window.location.search,
-            );
-          if (memberId && code) {
-            setSelectedMember(memberId);
-            initialSessionRequest.current = request<Session>("/api/session", {
-              memberId,
-              inviteCode: code,
-            });
-          } else
-            initialSessionRequest.current = request<Session>("/api/session");
+          initialSessionRequest.current = request<Session>("/api/session");
         }
         const data = await initialSessionRequest.current;
         if (!cancelled) {
@@ -261,7 +230,7 @@ export default function EventApp() {
               identity === currentIdentity.current
             ) {
               apply(data);
-              setConnection("Đã cập nhật");
+              setConnection("");
             }
           } catch {
             setConnection("Chưa kết nối được — đang thử lại");
@@ -297,12 +266,11 @@ export default function EventApp() {
     };
   }, [apply, refresh, tab, game.isLive, connection]);
 
-  // Initialize only after the authenticated user's server snapshot has loaded.
+  // Initialize only after this roster identity’s server snapshot has loaded.
   // Polls then update the saved summary without overwriting the draft.
   useEffect(() => {
     if (!user || !loaded || initializedFor.current === user.id) return;
     const saved = rsvps[user.id];
-    const order = milkTeaOrders[user.id];
     setAttendance(saved?.attendanceStatus || "");
     setRide(
       saved?.joinSharedRide1715 === undefined
@@ -311,20 +279,27 @@ export default function EventApp() {
           ? "yes"
           : "no",
     );
-    setWantsDrink(order ? "yes" : saved?.attendanceStatus ? "no" : "");
-    setDrink(order?.drinkName || "");
-    setSugar(order?.sugar || "");
-    setIce(order?.ice || "");
-    setNote(order?.note || "");
-    setDietaryNote(saved?.dietaryNote || "");
     setPlusOne(!!saved?.hasPlusOne);
+    setGameCompanion(saved?.gameCompanion === true);
     setPlusOneName(saved?.plusOneName || "");
-    setTransport(saved?.transportOption || "");
+    setTransport(
+      ["grab", "self"].includes(saved?.transportOption || "")
+        ? saved!.transportOption!
+        : "",
+    );
     setWish("");
     setEditing(!saved?.attendanceStatus);
     dirty.current = false;
     initializedFor.current = user.id;
-  }, [user, loaded, rsvps, milkTeaOrders]);
+  }, [user, loaded, rsvps]);
+
+  useEffect(() => {
+    const protectDraft = (event: BeforeUnloadEvent) => {
+      if (dirty.current) event.preventDefault();
+    };
+    window.addEventListener("beforeunload", protectDraft);
+    return () => window.removeEventListener("beforeunload", protectDraft);
+  }, []);
 
   useEffect(() => {
     if (
@@ -347,6 +322,7 @@ export default function EventApp() {
 
   function navigate(next: Tab) {
     setTab(next);
+    setMessage("");
     setPresentation(false);
     window.scrollTo({ top: 0, behavior: "instant" });
     requestAnimationFrame(() =>
@@ -358,22 +334,13 @@ export default function EventApp() {
     submitId.current = null;
     setMessage("");
   }
-  async function login(event: React.FormEvent) {
-    event.preventDefault();
-    if (signingIn) return;
-    if (!selectedMember || !inviteCode.trim()) {
-      setAuthError("Chọn tên của bạn và nhập mã mời cá nhân.");
-      document
-        .getElementById(!selectedMember ? "member" : "invite-code")
-        ?.focus();
-      return;
-    }
+  async function login(memberId: string) {
+    if (signingIn || !sessionLoaded) return;
     setSigningIn(true);
     setAuthError("");
     try {
       const data = await request<Session>("/api/session", {
-        memberId: selectedMember,
-        inviteCode,
+        memberId,
       });
       ++latestRequest.current;
       currentIdentity.current = data.memberId;
@@ -381,14 +348,13 @@ export default function EventApp() {
       setLoaded(false);
       setSnapshot(emptySnapshot);
       setSession(data);
-      setInviteCode("");
       await refresh();
-      setMessage("Đã mở đăng ký của bạn.");
+      navigate("personal");
     } catch (error) {
       setAuthError(
         error instanceof Error
           ? error.message
-          : "Chưa đăng nhập được. Hãy thử lại.",
+          : "Chưa mở được trang của bạn. Thử lại nhé.",
       );
     } finally {
       setSigningIn(false);
@@ -414,13 +380,12 @@ export default function EventApp() {
       setSnapshot(emptySnapshot);
       setLoaded(false);
       setLogoutConfirm(false);
-      setSelectedMember("");
       setMessage("");
       setFormError("");
       navigate("personal");
       await refresh();
     } catch {
-      setMessage("Chưa đăng xuất được. Hãy kiểm tra kết nối và thử lại.");
+      setMessage("Chưa đổi được người. Kiểm tra kết nối và thử lại nhé.");
     }
   }
   async function save(event: React.FormEvent) {
@@ -432,12 +397,6 @@ export default function EventApp() {
       invalid.ride = true;
     if (attendance === "attending" && user.gender === "male" && !transport)
       invalid.transport = true;
-    if (user.gender === "female" && !wantsDrink) invalid["wants-drink"] = true;
-    if (user.gender === "female" && wantsDrink === "yes") {
-      if (!drink) invalid.drink = true;
-      if (!sugar) invalid.sugar = true;
-      if (!ice) invalid.ice = true;
-    }
     setInvalidFields(invalid);
     if (Object.keys(invalid).length) {
       setFormError("Vui lòng chọn đầy đủ các mục được đánh dấu trước khi lưu.");
@@ -464,13 +423,8 @@ export default function EventApp() {
         attendanceStatus: attendance,
         attending: attendance === "attending",
         joinSharedRide1715: attendance === "attending" && ride === "yes",
-        wantsDrink: wantsDrink === "yes",
-        drinkName: drink,
-        sugar,
-        ice,
-        note,
-        dietaryNote,
         hasPlusOne: attendance === "attending" && plusOne,
+        gameCompanion: attendance === "attending" && gameCompanion,
         plusOneName,
         transportOption: attendance === "attending" ? transport : undefined,
         wishContent: wish.trim(),
@@ -543,79 +497,83 @@ export default function EventApp() {
 
   const inviteCard = (
     <section className="invitation card">
-      <p className="eyebrow">KTCNMT · 20.10.2026</p>
-      {user?.gender === "female" && (
+      <div className="letter-top">
+        <span aria-hidden="true">✿</span>
+        <span>Tháng Mười, gửi thương mến</span>
+      </div>
+      {user && (
         <MemberAvatar
           id={user.id}
           name={user.shortName}
           fullName={user.fullName}
           gender={user.gender}
-          size="xl"
+          size="2xl"
+          highlight
         />
       )}
       <h2>
         {user?.gender === "female"
           ? `Gửi ${user.shortName},`
-          : "Gửi chị em KTCNMT,"}
+          : user
+            ? `Chào ${user.shortName},`
+            : "Gửi những bông hoa KTCNMT,"}
       </h2>
-      <p className="invitation-lead">Một buổi hẹn, nhiều niềm vui.</p>
-      <p>
-        Nhân ngày Phụ nữ Việt Nam, chúc chị em luôn mạnh khỏe, bình an và có
-        nhiều niềm vui trong công việc lẫn cuộc sống. Cảm ơn chị em đã cùng xây
-        dựng tập thể KTCNMT.
+      <p className="invitation-lead">
+        Một buổi hẹn,
+        <br />
+        nhiều niềm vui.
       </p>
-      <p className="signature">Thân mến, Anh em KTCNMT</p>
-      <a className="quiet-button registration-anchor" href="#registration">
-        {user ? "Đến đăng ký của bạn ↓" : "Mở đăng ký của bạn ↓"}
-      </a>
-      <div className="event-detail">
-        <Calendar aria-hidden="true" />
-        <div>
-          <strong>{RESTAURANT_INFO.time}</strong>
-          <p>Buổi gặp mặt mừng 20/10</p>
+      <p>
+        {user?.wish ||
+          (user
+            ? "Cùng anh em chuẩn bị một buổi tối thật vui cho chị em nhé. Có mặt, đồng hành hay gửi một lời chúc — cứ chọn điều phù hợp với mình."
+            : "Một lời chúc nhỏ, một buổi tối bên nhau. Anh em KTCNMT mến chúc chị em ngày 20/10 thật vui, bình an và luôn được yêu thương.")}
+      </p>
+      <p className="signature">Thân mến, anh em KTCNMT ♡</p>
+      {user && (
+        <a className="quiet-button registration-anchor" href="#registration">
+          Hẹn gặp nhau nhé ↓
+        </a>
+      )}
+      <div className="itinerary">
+        <h3>Buổi hẹn của chúng mình</h3>
+        <div className="event-detail">
+          <span className="time-marker">{EVENT_INFO.sharedRide.departure}</span>
+          <div>
+            <strong>Cùng nhau lên xe</strong>
+            <p>
+              Thứ Hai, 19/10/2026 · Taxi từ {EVENT_INFO.sharedRide.meetingPoint}{" "}
+              đến {EVENT_INFO.sharedRide.destination}. Chị em đi cùng anh em
+              trong phòng.
+            </p>
+            <a
+              href={EVENT_INFO.sharedRide.mapsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Xem đường đi · {EVENT_INFO.sharedRide.estimate} dự kiến ↗
+            </a>
+            <p>Mình đi sớm một chút để tránh kẹt xe nhé.</p>
+          </div>
         </div>
-      </div>
-      <div className="event-detail">
-        <MapPin aria-hidden="true" />
-        <div>
-          <strong>{RESTAURANT_INFO.name}</strong>
-          <p>{RESTAURANT_INFO.address}</p>
-          <a
-            href={RESTAURANT_INFO.mapsUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Mở bản đồ ↗
-          </a>
+        <div className="event-detail">
+          <span className="time-marker">19h00</span>
+          <div>
+            <strong>Quây quần ở The Street · Chi nhánh 9</strong>
+            <p>{RESTAURANT_INFO.address}</p>
+            <a
+              href={RESTAURANT_INFO.mapsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Mở bản đồ quán ↗
+            </a>
+          </div>
         </div>
       </div>
       <p className="muted">
-        Bạn cứ chọn trang phục mình thấy thoải mái và tự tin.
+        Cứ chọn trang phục mình thấy thoải mái và tự tin nhé.
       </p>
-      <details>
-        <summary>Di chuyển & thông tin cần biết</summary>
-        <div className="details-content">
-          <p>
-            Giờ xe: {EVENT_INFO.sharedRide.time}. Điểm tập trung:{" "}
-            {EVENT_INFO.sharedRide.meetingPoint}. Chiều về:{" "}
-            {EVENT_INFO.sharedRide.returnPlan}.
-          </p>
-          <p>
-            Hạn đăng ký: {EVENT_INFO.registrationDeadline}. Đầu mối hỗ trợ:{" "}
-            {EVENT_INFO.contact}. Vui lòng theo dõi thông báo của ban tổ chức
-            trong nhóm phòng.
-          </p>
-          <p>
-            Đồ uống dành cho chị em vào sáng 20/10; giờ nhận cụ thể:{" "}
-            {EVENT_INFO.drinks.time}. Đăng ký tiệc tối và chọn đồ uống là hai
-            lựa chọn độc lập.
-          </p>
-          <p>
-            Menu bữa tối chưa công bố. Bạn có thể ghi nhu cầu ăn uống trong đăng
-            ký; thông tin này chỉ dành cho bạn và người phụ trách hậu cần.
-          </p>
-        </div>
-      </details>
     </section>
   );
 
@@ -635,6 +593,7 @@ export default function EventApp() {
           <button
             type="button"
             className="quiet-button account"
+            aria-label="Đổi thành viên"
             disabled={saving || gamePending || !!pendingLike}
             onClick={() => {
               if (dirty.current) setLogoutConfirm(true);
@@ -653,15 +612,14 @@ export default function EventApp() {
       </header>
       <div className="page-heading">
         <div>
-          <p className="eyebrow">19 — 20 tháng 10</p>
           <h1 ref={titleRef} tabIndex={-1} id="main-content">
             {tab === "personal"
               ? user
                 ? `Chào ${user.shortName}`
-                : "Lời mời dành cho bạn"
+                : "Tháng Mười, có bạn thật vui."
               : tab === "wall"
                 ? "Những lời chúc gửi trao"
-                : "Túi mù & niềm vui"}
+                : "Một chút vui cùng nhau"}
           </h1>
         </div>
         <p className="connection" role="status">
@@ -692,69 +650,83 @@ export default function EventApp() {
         </div>
       )}
 
+      {tab === "personal" && !user && (
+        <section className="welcome-picker" aria-label="Chọn ảnh của bạn">
+          <div className="welcome-copy">
+            <span className="welcome-flower" aria-hidden="true">
+              ✿
+            </span>
+            <h2>Món quà nhỏ dành cho chị em</h2>
+            <p>
+              Chạm vào ảnh của mình để mở lời nhắn và hẹn nhau một buổi tối thật
+              vui nhé.
+            </p>
+          </div>
+          <div className="women-picks">
+            {STAFF_MEMBERS.filter((m) => m.gender === "female").map(
+              (member) => (
+                <button
+                  className="portrait-pick"
+                  key={member.id}
+                  type="button"
+                  disabled={signingIn || !sessionLoaded}
+                  onClick={() => void login(member.id)}
+                  aria-label={`Mở trang của ${member.fullName}`}
+                >
+                  <MemberAvatar
+                    id={member.id}
+                    name={member.shortName}
+                    fullName={member.fullName}
+                    gender={member.gender}
+                    size="2xl"
+                    highlight
+                  />
+                  <span>{member.shortName}</span>
+                  <small>Mở lời nhắn ♡</small>
+                </button>
+              ),
+            )}
+          </div>
+          <div className="men-title">
+            <span>Anh em nhà mình</span>
+            <p>Cùng đến, cùng vui, cùng gửi lời chúc.</p>
+          </div>
+          <div className="men-picks">
+            {STAFF_MEMBERS.filter((m) => m.gender === "male").map((member) => (
+              <button
+                className="portrait-pick"
+                key={member.id}
+                type="button"
+                disabled={signingIn || !sessionLoaded}
+                onClick={() => void login(member.id)}
+                aria-label={`Mở trang của ${member.fullName}`}
+              >
+                <MemberAvatar
+                  id={member.id}
+                  name={member.shortName}
+                  fullName={member.fullName}
+                  gender={member.gender}
+                  size="lg"
+                />
+                <span>{member.shortName}</span>
+              </button>
+            ))}
+          </div>
+          {signingIn && <p role="status">Đang mở trang của bạn…</p>}
+          {authError && (
+            <p className="feedback error" role="alert">
+              {authError}
+            </p>
+          )}
+        </section>
+      )}
       {tab === "personal" && (
-        <div className="personal-grid">
+        <div className={`personal-grid ${!user ? "welcome-itinerary" : ""}`}>
           {inviteCard}
           <div className="registration-column" id="registration">
-            {!user ? (
-              <section className="card">
-                <p className="eyebrow">Đăng ký của bạn</p>
-                <h2>Mở lời mời cá nhân</h2>
-                <p className="muted">
-                  Chọn đúng tên và nhập mã mời do ban tổ chức cung cấp. Nếu có
-                  liên kết mời riêng, bạn có thể mở trực tiếp liên kết đó.
-                </p>
-                <form noValidate onSubmit={login} className="form-stack">
-                  <fieldset disabled={signingIn} className="form-fields">
-                    <label htmlFor="member">Thành viên</label>
-                    <select
-                      id="member"
-                      value={selectedMember}
-                      required
-                      onChange={(event) =>
-                        setSelectedMember(event.target.value)
-                      }
-                    >
-                      <option value="">Chọn tên của bạn</option>
-                      {STAFF_MEMBERS.map((member) => (
-                        <option key={member.id} value={member.id}>
-                          {member.fullName}
-                        </option>
-                      ))}
-                    </select>
-                    <label htmlFor="invite-code">Mã mời cá nhân</label>
-                    <input
-                      id="invite-code"
-                      type="password"
-                      autoComplete="current-password"
-                      value={inviteCode}
-                      onChange={(event) => setInviteCode(event.target.value)}
-                      required
-                    />
-                    <button
-                      className="primary-button"
-                      disabled={signingIn || !sessionLoaded}
-                    >
-                      {signingIn ? "Đang mở…" : "Mở đăng ký"}
-                    </button>
-                    {authError && (
-                      <p role="alert" className="feedback error">
-                        {authError}
-                      </p>
-                    )}
-                    {sessionLoaded && !session.configured && (
-                      <p className="muted">
-                        Đăng ký chưa mở. Bạn vẫn có thể xem lời mời, lời chúc và
-                        chương trình. Ban tổ chức cần thiết lập mã mời trước khi
-                        nhận đăng ký.
-                      </p>
-                    )}
-                  </fieldset>
-                </form>
-              </section>
-            ) : !loaded ? (
+            {!user ? null : !loaded ? (
               <section className="card" aria-busy="true">
-                <h2>Đăng ký của bạn</h2>
+                <h2>Hẹn nhau nhé</h2>
                 <p>Đang tải lựa chọn đã lưu…</p>
                 <button
                   type="button"
@@ -767,14 +739,13 @@ export default function EventApp() {
             ) : (
               <section
                 className="card registration"
-                aria-label="Đăng ký tham dự"
+                aria-label="Hẹn nhau buổi tối"
               >
-                <p className="eyebrow">Tùy theo lịch của bạn</p>
-                <h2>Lựa chọn của bạn</h2>
+                <h2>Hẹn nhau buổi tối nhé</h2>
                 {myRsvp && !myRsvp.attendanceStatus && (
                   <p className="feedback legacy-notice" role="status">
-                    Có dữ liệu đăng ký từ phiên bản cũ. Vui lòng kiểm tra và lưu
-                    lại để xác nhận; dữ liệu này chưa được tính vào số người
+                    Lựa chọn từ lần trước vẫn còn ở đây. Vui lòng kiểm tra và
+                    lưu lại để xác nhận; dữ liệu này chưa được tính vào số người
                     tham dự.
                   </p>
                 )}
@@ -795,11 +766,19 @@ export default function EventApp() {
                         <strong>Di chuyển:</strong>{" "}
                         {user.gender === "female"
                           ? myRsvp.joinSharedRide1715
-                            ? "Muốn đi xe chung"
-                            : "Tự di chuyển"
+                            ? "Đi taxi cùng mọi người"
+                            : "Mình tự di chuyển"
                           : MALE_TRANSPORT_OPTIONS.find(
                               (option) => option.id === myRsvp.transportOption,
-                            )?.label || "Tự di chuyển"}
+                            )?.label || "Mình tự di chuyển"}
+                      </p>
+                    )}
+                    {user.gender === "male" && myRsvp.attending && (
+                      <p>
+                        <strong>Cùng chơi:</strong>{" "}
+                        {myRsvp.gameCompanion
+                          ? "Sẵn lòng đồng hành"
+                          : "Ngồi cổ vũ cũng vui"}
                       </p>
                     )}
                     {myRsvp.hasPlusOne && (
@@ -807,18 +786,6 @@ export default function EventApp() {
                         <strong>Khách đi cùng:</strong>{" "}
                         {myRsvp.plusOneName || "1 khách"}
                       </p>
-                    )}
-                    {user.gender === "female" && (
-                      <p>
-                        <strong>Đồ uống 20/10:</strong>{" "}
-                        {myOrder
-                          ? `${myOrder.drinkName} · ${myOrder.sugar} · ${myOrder.ice}`
-                          : "Không dùng đồ uống"}
-                      </p>
-                    )}
-                    {myOrder?.note && <p>Ghi chú đồ uống: {myOrder.note}</p>}
-                    {myRsvp.dietaryNote && (
-                      <p>Nhu cầu ăn uống: {myRsvp.dietaryNote}</p>
                     )}
                     <p className="muted">
                       Cập nhật {dateTime(myRsvp.updatedAt)} · giờ Việt Nam
@@ -831,7 +798,7 @@ export default function EventApp() {
                         setMessage("");
                       }}
                     >
-                      Chỉnh sửa đăng ký
+                      Đổi lựa chọn
                     </button>
                   </div>
                 ) : (
@@ -843,7 +810,7 @@ export default function EventApp() {
                   >
                     <fieldset disabled={saving} className="form-fields">
                       <fieldset>
-                        <legend>Tiệc tối 19/10</legend>
+                        <legend>Tối 19/10, mình có đến được không?</legend>
                         <div className="choice-stack">
                           {Object.entries(attendanceLabels).map(
                             ([value, label]) => (
@@ -876,8 +843,8 @@ export default function EventApp() {
                             <legend>Di chuyển đến buổi tiệc</legend>
                             <div className="choice-stack">
                               {[
-                                ["yes", "Muốn đi xe chung"],
-                                ["no", "Tự di chuyển"],
+                                ["yes", "Đi taxi cùng mọi người"],
+                                ["no", "Mình tự di chuyển"],
                               ].map(([value, label]) => (
                                 <label className="choice" key={value}>
                                   <input
@@ -898,8 +865,8 @@ export default function EventApp() {
                               ))}
                             </div>
                             <p className="hint">
-                              Đây là nhu cầu di chuyển, chưa phải chuyến xe đã
-                              được xếp. Giờ và điểm đón sẽ được thông báo sau.
+                              Taxi khởi hành 17h00 tại 2 Sông Đáy, dự kiến 45–60
+                              phút đến quán.
                             </p>
                           </fieldset>
                         ) : (
@@ -912,7 +879,7 @@ export default function EventApp() {
                                   setPlusOne(event.target.checked)
                                 }
                               />
-                              <span>Có một khách đi cùng</span>
+                              <span>Mình có một người đi cùng (tùy chọn)</span>
                             </label>
                             {plusOne && (
                               <>
@@ -929,8 +896,24 @@ export default function EventApp() {
                                 />
                               </>
                             )}
+                            <label className="choice">
+                              <input
+                                type="checkbox"
+                                checked={gameCompanion}
+                                onChange={(event) =>
+                                  setGameCompanion(event.target.checked)
+                                }
+                              />
+                              <span>
+                                Mình sẵn lòng cùng chơi khi được mời đồng hành
+                              </span>
+                            </label>
+                            <p className="hint">
+                              Hoàn toàn tùy ý. Mọi người cùng vui tại bàn, có
+                              thể đổi thử thách hoặc bỏ qua bất cứ lúc nào.
+                            </p>
                             <label htmlFor="transport">
-                              Di chuyển & hỗ trợ
+                              Mình đến bằng cách nào?
                             </label>
                             <select
                               id="transport"
@@ -947,7 +930,6 @@ export default function EventApp() {
                               }
                             >
                               <option value="">Chọn phương án</option>
-                              <option value="self">Tự di chuyển</option>
                               {MALE_TRANSPORT_OPTIONS.map((option) => (
                                 <option key={option.id} value={option.id}>
                                   {option.label}
@@ -955,151 +937,11 @@ export default function EventApp() {
                               ))}
                             </select>
                             <p className="hint">
-                              Nhu cầu hỗ trợ sẽ được ban tổ chức xác nhận riêng
-                              trước khi xếp chuyến.
+                              Anh em đi taxi cùng chị em lúc 17h00 từ 2 Sông
+                              Đáy; ai muốn tự đi cũng thoải mái nhé.
                             </p>
                           </>
                         ))}
-                      <label htmlFor="dietary-note">
-                        Nhu cầu ăn uống (tùy chọn)
-                      </label>
-                      <textarea
-                        className="resize-none"
-                        id="dietary-note"
-                        rows={2}
-                        maxLength={500}
-                        value={dietaryNote}
-                        onChange={(event) => setDietaryNote(event.target.value)}
-                        placeholder="Ví dụ: ăn chay, món không dùng…"
-                      />
-                      <p className="hint">
-                        Chỉ bạn và hậu cần xem được. Nhu cầu cần hỗ trợ riêng
-                        nên trao đổi trực tiếp với ban tổ chức trong nhóm phòng.
-                      </p>
-                      {user.gender === "female" && (
-                        <>
-                          <fieldset>
-                            <legend>Đồ uống sáng 20/10</legend>
-                            <p className="muted">
-                              Bạn có thể chọn đồ uống dù không tham dự tiệc tối.
-                            </p>
-                            <div className="choice-stack">
-                              {[
-                                ["yes", "Chọn một món"],
-                                ["no", "Không dùng đồ uống"],
-                              ].map(([value, label]) => (
-                                <label className="choice" key={value}>
-                                  <input
-                                    type="radio"
-                                    name="wants-drink"
-                                    aria-invalid={
-                                      !!invalidFields["wants-drink"]
-                                    }
-                                    aria-describedby={
-                                      invalidFields["wants-drink"]
-                                        ? "registration-error"
-                                        : undefined
-                                    }
-                                    checked={wantsDrink === value}
-                                    required
-                                    onChange={() => setWantsDrink(value)}
-                                  />
-                                  <span>{label}</span>
-                                </label>
-                              ))}
-                            </div>
-                          </fieldset>
-                          {wantsDrink === "yes" && (
-                            <>
-                              <label htmlFor="drink">Món bạn chọn</label>
-                              <select
-                                id="drink"
-                                aria-invalid={!!invalidFields["drink"]}
-                                aria-describedby={
-                                  invalidFields["drink"]
-                                    ? "registration-error"
-                                    : undefined
-                                }
-                                required
-                                value={drink}
-                                onChange={(event) =>
-                                  setDrink(event.target.value)
-                                }
-                              >
-                                <option value="">Chọn đồ uống</option>
-                                {MILK_TEA_MENU.map((item) => (
-                                  <option key={item.id} value={item.name}>
-                                    {item.name}
-                                  </option>
-                                ))}
-                              </select>
-                              <div className="form-pair">
-                                <div>
-                                  <label htmlFor="sugar">Lượng đường</label>
-                                  <select
-                                    id="sugar"
-                                    aria-invalid={!!invalidFields["sugar"]}
-                                    aria-describedby={
-                                      invalidFields["sugar"]
-                                        ? "registration-error"
-                                        : undefined
-                                    }
-                                    required
-                                    value={sugar}
-                                    onChange={(event) =>
-                                      setSugar(event.target.value)
-                                    }
-                                  >
-                                    <option value="">Chọn mức đường</option>
-                                    {SUGAR_LEVELS.map((value) => (
-                                      <option key={value}>{value}</option>
-                                    ))}
-                                  </select>
-                                </div>
-                                <div>
-                                  <label htmlFor="ice">Lượng đá</label>
-                                  <select
-                                    id="ice"
-                                    aria-invalid={!!invalidFields["ice"]}
-                                    aria-describedby={
-                                      invalidFields["ice"]
-                                        ? "registration-error"
-                                        : undefined
-                                    }
-                                    required
-                                    value={ice}
-                                    onChange={(event) =>
-                                      setIce(event.target.value)
-                                    }
-                                  >
-                                    <option value="">Chọn mức đá</option>
-                                    {ICE_LEVELS.map((value) => (
-                                      <option key={value}>{value}</option>
-                                    ))}
-                                  </select>
-                                </div>
-                              </div>
-                              <label htmlFor="drink-note">
-                                Ghi chú đồ uống (tùy chọn)
-                              </label>
-                              <textarea
-                                className="resize-none"
-                                id="drink-note"
-                                rows={2}
-                                maxLength={500}
-                                value={note}
-                                onChange={(event) =>
-                                  setNote(event.target.value)
-                                }
-                              />
-                              <p className="hint">
-                                Các tùy chỉnh ngoài menu cần ban tổ chức xác
-                                nhận với cửa hàng.
-                              </p>
-                            </>
-                          )}
-                        </>
-                      )}
                       {user.gender === "male" && (
                         <>
                           <label htmlFor="wish">
@@ -1137,8 +979,7 @@ export default function EventApp() {
                         {saving ? "Đang lưu…" : "Lưu lựa chọn"}
                       </button>
                       <p className="hint">
-                        Bạn có thể quay lại chỉnh sửa. Hạn chốt đăng ký:{" "}
-                        {EVENT_INFO.registrationDeadline}.
+                        Bạn có thể quay lại đổi lựa chọn bất cứ lúc nào.
                       </p>
                     </fieldset>
                   </form>
@@ -1158,22 +999,17 @@ export default function EventApp() {
                     <strong>{guests}</strong>
                     <span>Khách đi cùng</span>
                   </div>
-                  <div>
-                    <strong>{Object.keys(milkTeaOrders).length}</strong>
-                    <span>Đơn đồ uống</span>
-                  </div>
                 </div>
                 <p className="hint">
-                  Đăng ký tham dự chưa phải xác nhận có mặt. Trước khi mở game,
-                  hãy đối chiếu danh sách thực tế và phần quà. Danh sách game
-                  được cố định khi bắt đầu.
+                  Hẹn tham dự chưa có nghĩa là đã có mặt. Trước khi mở game, hãy
+                  đối chiếu danh sách thực tế và phần quà. Danh sách game được
+                  cố định khi bắt đầu.
                 </p>
                 <details>
-                  <summary>Danh sách đăng ký & nhu cầu</summary>
+                  <summary>Mọi người đã hẹn thế nào?</summary>
                   <div className="logistics-list">
                     {STAFF_MEMBERS.map((member) => {
                       const rsvp = rsvps[member.id];
-                      const order = milkTeaOrders[member.id];
                       return (
                         <article key={member.id}>
                           <strong>{member.fullName}</strong>
@@ -1191,21 +1027,12 @@ export default function EventApp() {
                             <p>
                               {member.gender === "female"
                                 ? rsvp.joinSharedRide1715
-                                  ? "Muốn đi xe chung"
-                                  : "Tự di chuyển"
+                                  ? "Đi taxi cùng mọi người"
+                                  : "Mình tự di chuyển"
                                 : MALE_TRANSPORT_OPTIONS.find(
                                     (option) =>
                                       option.id === rsvp.transportOption,
-                                  )?.label || "Tự di chuyển"}
-                            </p>
-                          )}
-                          {rsvp?.dietaryNote && (
-                            <p>Nhu cầu: {rsvp.dietaryNote}</p>
-                          )}
-                          {order && (
-                            <p>
-                              {order.drinkName} · {order.sugar} · {order.ice}
-                              {order.note ? ` · ${order.note}` : ""}
+                                  )?.label || "Mình tự di chuyển"}
                             </p>
                           )}
                         </article>
@@ -1234,7 +1061,7 @@ export default function EventApp() {
                 className="quiet-button"
                 onClick={() => navigate("personal")}
               >
-                Mở lời mời để gửi lời chúc hoặc thả tim →
+                Chọn ảnh của mình để gửi lời chúc hoặc thả tim →
               </button>
             )}
           </div>
@@ -1244,7 +1071,7 @@ export default function EventApp() {
             <div className="card empty-state">
               <Heart aria-hidden="true" />
               <h2>Lời chúc đầu tiên đang chờ được gửi</h2>
-              <p>Anh em có thể viết lời nhắn ở mục đăng ký của mình.</p>
+              <p>Anh em có thể viết lời nhắn ở trang của mình.</p>
             </div>
           ) : (
             <div className="wish-grid">
@@ -1290,29 +1117,27 @@ export default function EventApp() {
       {tab === "game" && (
         <div className="game-layout">
           <section className="card game-stage">
-            <div className="section-row">
-              <p className="eyebrow">Cùng vui, luôn tự nguyện</p>
-              <button
-                type="button"
-                className="quiet-button"
-                onClick={() => setPresentation(!presentation)}
-              >
-                {presentation ? "Thu gọn màn hình" : "Màn trình chiếu"}
-              </button>
-            </div>
-            <p className="muted">
-              Có thể bỏ qua lượt hoặc đổi sang một lời chúc. Chụp, quay và chia
-              sẻ ảnh chỉ khi người được chụp đồng ý; mọi thức uống đều tùy chọn.
-            </p>
-            {game.phase === "WAITING" ? (
-              <div className="empty-state">
-                <Gift aria-hidden="true" />
-                <h2>Chờ buổi hẹn bắt đầu</h2>
-                <p>
-                  Trò chơi sẽ mở khi ban tổ chức sẵn sàng. Bạn có thể xem thiệp
-                  hoặc gửi lời chúc trong lúc chờ.
+            {game.phase !== "WAITING" && (
+              <>
+                <div className="section-row">
+                  <p className="eyebrow">Cùng vui, luôn tự nguyện</p>
+                  <button
+                    type="button"
+                    className="quiet-button"
+                    onClick={() => setPresentation(!presentation)}
+                  >
+                    {presentation ? "Thu gọn màn hình" : "Màn trình chiếu"}
+                  </button>
+                </div>
+                <p className="muted">
+                  Có thể bỏ qua lượt hoặc đổi sang một lời chúc. Chụp, quay và
+                  chia sẻ ảnh chỉ khi người được chụp đồng ý; mọi thức uống đều
+                  tùy chọn.
                 </p>
-              </div>
+              </>
+            )}
+            {game.phase === "WAITING" ? (
+              <MemoryGame />
             ) : game.phase === "COMPLETED" ? (
               <div className="empty-state">
                 <Heart aria-hidden="true" />
@@ -1472,7 +1297,7 @@ export default function EventApp() {
           </section>
           {session.isAdmin && !presentation && (
             <section className="card host-panel">
-              <p className="eyebrow">Quyền quản trị đã xác thực</p>
+              <p className="eyebrow">Anh Dương giữ nhịp buổi vui</p>
               <h2>Điều khiển chương trình</h2>
               <p className="muted">
                 Kiểm tra người tham dự thực tế và đủ quà trước khi bắt đầu. Chỉ
@@ -1519,7 +1344,7 @@ export default function EventApp() {
               <details className="danger-zone">
                 <summary>Đặt lại chương trình</summary>
                 <p>
-                  Thao tác này xóa toàn bộ kết quả trò chơi, giữ nguyên đăng ký
+                  Thao tác này xóa toàn bộ kết quả trò chơi, giữ nguyên lựa chọn
                   và lời chúc.
                 </p>
                 {!resetConfirm ? (
@@ -1599,7 +1424,7 @@ export default function EventApp() {
             [
               {
                 id: "personal",
-                label: user ? "Của bạn" : "Lời mời",
+                label: user ? "Của bạn" : "Nhà mình",
                 Icon: Calendar,
               },
               { id: "wall", label: "Lời chúc", Icon: MessageSquareHeart },
@@ -1619,7 +1444,8 @@ export default function EventApp() {
         </nav>
       )}
       <footer>
-        KTCNMT · 20.10.2026<span>Được chuẩn bị với sự trân trọng.</span>
+        KTCNMT · 20.10.2026
+        <span>Một chút thương mến, từ anh em trong phòng.</span>
       </footer>
     </main>
   );

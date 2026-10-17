@@ -17,6 +17,7 @@ export interface MemberRsvp {
   source?: "member-session";
   joinSharedRide1715?: boolean;
   hasPlusOne?: boolean;
+  gameCompanion?: boolean;
   plusOneName?: string;
   transportOption?: MaleTransportOptionId;
   updatedAt: string;
@@ -420,13 +421,16 @@ export function pickRandomMaleForGame(state: AppStateData): {
   const unassignedMales = MALE_MEMBERS.filter(
     (m) =>
       state.rsvps[m.id]?.attendanceStatus === "attending" &&
+      state.rsvps[m.id]?.gameCompanion === true &&
       !alreadyAssignedIds.has(m.id),
   );
   const pool =
     unassignedMales.length > 0
       ? unassignedMales
       : MALE_MEMBERS.filter(
-          (m) => state.rsvps[m.id]?.attendanceStatus === "attending",
+          (m) =>
+            state.rsvps[m.id]?.attendanceStatus === "attending" &&
+            state.rsvps[m.id]?.gameCompanion === true,
         );
   if (!pool.length) throw new Error("No attending male participant");
   const chosen = pool[randomInt(pool.length)];

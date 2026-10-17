@@ -1,67 +1,38 @@
 # KTCNMT · Chúc mừng ngày 20/10
 
-Ứng dụng nội bộ của Phòng Kỹ thuật Công nghệ Môi trường – ACV: thiệp, đăng ký tiệc và đồ uống, lời chúc thật và trò chơi tự nguyện.
+Món quà nhỏ từ anh em Phòng Kỹ thuật Công nghệ Môi trường – ACV: chọn ảnh của mình, đọc lời nhắn, hẹn tiệc tối, gửi lời chúc và chơi cùng nhau.
 
-Thông tin sự kiện lấy từ `EVENT_INFO` trong `src/data/roster.ts`: tiệc **19:00 ngày 19/10/2026**, **The Street (Chi nhánh 9)**, **134 Nguyễn Thái Học, P. Bến Thành, Quận 1, TP.HCM**. Đồ uống dành cho sáng 20/10. Giờ đồ uống, giờ/điểm tập trung xe, chiều về, hạn đăng ký và đầu mối chưa công bố. Không dùng danh sách mời để suy ra số người dự tiệc hoặc khách đi cùng.
+Taxi khởi hành **17h00 ngày 19/10/2026**, từ **2 Sông Đáy** đến **134 Nguyễn Thái Học**, dự kiến **45–60 phút**. Chị em đi cùng anh em trong phòng. Tiệc **19h00**, **The Street chi nhánh 9**. Thông tin tập trung trong `EVENT_INFO` ở `src/data/roster.ts`.
 
 ## Chạy local
 
 ```bash
 npm ci
-node scripts/setup-invites.mjs --base-url http://localhost:2010 --output-dir /tmp/ktcnmt-invites-private
-cp /tmp/ktcnmt-invites-private/event-auth.env .env.local
-npm run dev
+STATE_FILE_PATH=/tmp/ktcnmt-local/state.json npm run dev
 ```
 
-Ứng dụng mở tại `http://localhost:2010`. Khi chạy trực tiếp trên máy, đặt `STATE_FILE_PATH` trong `.env.local` thành đường dẫn tuyệt đối tới file runtime riêng mà tài khoản chạy app có quyền ghi, chẳng hạn `/tmp/ktcnmt-local/state.json`. Không dùng đường dẫn production `/app/data/state.json` cho local nếu chưa tạo volume/quyền ghi tương ứng.
+Mở `http://localhost:2010`. Không cần mã, khóa phiên hay script thiết lập. Chọn ảnh để mở trang riêng; cookie nhớ người vừa chọn. “Đổi thành viên” trở về ảnh mọi người. Host được xác định bằng `isHost` trong roster. Đây là nhận diện tiện dụng trong phòng, **không phải xác thực mạnh**; người có đường dẫn có thể chọn bất kỳ danh tính nào, kể cả host. Đây là lựa chọn sản phẩm theo yêu cầu chủ ứng dụng.
 
-Có thể dùng `docker compose up -d --build` sau khi tạo `.env.local`; cấu hình compose hiện tại dành cho phát triển, mount `./data` vào `/app/data`. Không dùng dữ liệu local làm dữ liệu live. Kiểm tra mã nguồn bằng `npx tsc --noEmit` và `npm run build`.
+`STATE_FILE_PATH` chọn file runtime riêng, mặc định `data/state.json`. `PORT` tùy chỉnh cổng. `EVENT_PUBLIC_ORIGIN` là tùy chọn cho reverse proxy/domain tùy chỉnh, ví dụ `https://ltia-ktcnmt.up.railway.app` (không dấu `/` cuối); mặc định dùng Railway public domain hoặc origin request. Các biến mã/khóa mời của phiên bản cũ không còn được sử dụng.
 
-## Mã mời và phiên đăng nhập
+Có thể dùng `docker compose up -d --build` để phát triển. Không chạy kiểm thử trên dữ liệu local thật hoặc Railway. Kiểm tra type bằng `npx tsc --noEmit`, production bằng `npm run build`; backend bằng `node scripts/backend-test.cjs` (tự dùng thư mục tạm và tự dọn).
 
-Tạo mã cho production bằng lệnh dưới đây, thay domain bằng URL ứng dụng thực tế và chọn thư mục riêng **bên ngoài repository**:
+## Hành vi và dữ liệu
 
-```bash
-node scripts/setup-invites.mjs --base-url https://ltia-ktcnmt.up.railway.app --output-dir /srv/ktcnmt-private
-```
+Mỗi người tự chọn tham dự và taxi cùng nhau/tự di chuyển, không có xác nhận chọn sẵn. Anh em có thể chọn thêm người đi cùng và tự nguyện đồng hành trong trò chơi. Chỉ lời chúc người dùng chủ động nhập mới được đăng dưới tên người gửi. Không thêm số người, lời chúc hoặc lượt tim giả.
 
-Script tạo thư mục quyền `700` và ba file quyền `600`, không in bí mật ra stdout, không ghi đè file đã tồn tại:
+Trò lật thẻ trong lúc chờ chỉ lưu trong bộ nhớ trình duyệt, không gửi lượt chơi lên server. Khi host bắt đầu buổi vui, trò mở quà chung xuất hiện với danh sách tham dự được chốt tại thời điểm bắt đầu. Xác nhận tham dự chưa có nghĩa là đã có mặt: host cần đối chiếu thực tế và quà trước khi mở. Các thao tác vẫn kiểm tra lượt và phiên bản trạng thái, giữ kết quả chưa mở ở server. Mọi vai trò và thử thách tự nguyện, có thể đổi hoặc bỏ qua.
 
-- `event-auth.env`: các biến môi trường dùng phía server.
-- `member-invitations.tsv`: link mời riêng cho từng thành viên.
-- `host-invitations.tsv`: link quản trị riêng cho host.
+Các trường đặt món đã ngừng hiển thị và ngừng nhận qua API. Dữ liệu lịch sử vẫn được giữ trên disk; lưu lựa chọn đi lại không xóa đơn cũ hay ghi chú cũ. Các bản ghi đó không xuất hiện trong payload đơn hoặc công bố trên tường. RSVP cũ thiếu trạng thái rõ ràng được giữ để chính người đó xem và xác nhận lại, chưa được tính vào game.
 
-Đặt các biến sau trong Railway Variables; không đặt tiền tố `NEXT_PUBLIC_`, commit hoặc đưa chúng vào Docker image:
+## Railway và dữ liệu bền
 
-| Biến                      | Mục đích                                                                                                                                          |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `EVENT_PUBLIC_ORIGIN`     | Origin công khai chính xác của ứng dụng, ví dụ `https://ltia-ktcnmt.up.railway.app`; không có dấu `/` cuối. Bắt buộc khi dùng domain riêng/proxy. |
-| `EVENT_SESSION_SECRET`    | Khóa ký phiên ngẫu nhiên, ít nhất 32 ký tự                                                                                                        |
-| `EVENT_MEMBER_CODES_JSON` | JSON ánh xạ member ID trong roster tới mã mời riêng, không rỗng                                                                                   |
-| `EVENT_ADMIN_CODE`        | Mã quản trị riêng, khác mã thành viên                                                                                                             |
-| `STATE_FILE_PATH`         | `/app/data/state.json` trên volume production                                                                                                     |
+Railway dùng `Dockerfile` và `railway.json`, chạy `npm run start` với `$PORT`. Gắn volume bền tại `/app/data`, đặt `STATE_FILE_PATH=/app/data/state.json`. JSON store chỉ hỗ trợ **một instance/replica**, không scale ngang. Giữ nguyên volume qua redeploy; tuyệt đối không copy state kiểm thử lên live.
 
-Link mời chứa mã trong fragment `#member=...&code=...` và được client xóa khỏi URL sau khi tiếp nhận. Chỉ gửi link riêng cho đúng người qua kênh riêng; không chia sẻ bảng mã hoặc link quản trị lên nhóm. Mã thành viên của host chỉ cấp quyền thành viên; quyền quản trị cần mã admin riêng. Chọn avatar hoặc sửa localStorage không cấp quyền. Truy cập không có phiên hợp lệ chỉ nhận dữ liệu công khai đã lược bỏ thông tin riêng; cần đăng nhập trước khi xem đăng ký, hậu cần hoặc thực hiện thao tác.
+Trước thay đổi dữ liệu hoặc redeploy, sao lưu file volume vào nơi riêng, giới hạn quyền và kiểm tra khả năng khôi phục. Runtime/backup không nằm trong Git hay `public/`. File ghi atomically; ghi lỗi không đổi cache, file hỏng báo lỗi thay vì tạo state trắng. App chỉ loại các `wish-seed-*` đã nhận diện sau khi tạo backup; không xóa dữ liệu thật để làm sạch màn hình.
 
-## Railway, dữ liệu bền và redeploy
+Khôi phục khi cần: dừng ghi/service, giữ bản sao file hiện tại, đưa backup đã kiểm tra về `STATE_FILE_PATH`, bảo đảm quyền ghi rồi khởi động và đối chiếu. Kiểm tra redeploy bằng dữ liệu thật có sẵn và read-only; không tạo lời chúc/tim giả trên production.
 
-Railway dùng `Dockerfile` và `railway.json`; service chạy `npm run start` với `$PORT`. Trước khi chia sẻ link:
+## Ảnh và chữ
 
-1. Gắn **volume bền** vào service tại **`/app/data`**, đặt `STATE_FILE_PATH=/app/data/state.json` và các biến xác thực ở trên. Mô hình JSON file chỉ hỗ trợ **một instance/replica**; không scale ngang.
-2. Dữ liệu runtime không nằm trong Git hoặc build context. Khởi tạo mới phải có 0 RSVP, đơn, lời chúc và tim; tên trong roster chỉ là người được mời. Không copy `data/state.json` từ local lên volume live.
-3. Nếu service đã có dữ liệu, sao lưu file trên volume trước thay đổi hoặc redeploy. Bản backup có thông tin nội bộ: lưu ở nơi riêng, giới hạn quyền và kiểm tra có thể đọc/khôi phục. Không để backup trong repo hoặc `public/`.
-4. Khi làm sạch dữ liệu cũ, đối chiếu từng bản ghi với xác nhận thật. App tự sao lưu trước khi loại `wish-seed-*` đã nhận diện. RSVP cũ thiếu trạng thái xác nhận được giữ để kiểm tra, hiển thị “Cần xác nhận lại” và chưa tính vào thống kê hoặc danh sách game cho đến khi chính thành viên lưu lại. Các lượt tim cũ không xác minh được không được trình bày như tương tác thật. Dữ liệu seed khác phải được nhận diện và rà soát; không xóa toàn bộ hoặc ghi đè trạng thái live bằng trạng thái rỗng. Nếu file hỏng hoặc không ghi được, xử lý lỗi và khôi phục từ backup đã kiểm tra; không tạo state giả để che lỗi.
-5. Sau redeploy, đăng nhập bằng link mời riêng, kiểm tra đăng ký thật còn nguyên và không xuất hiện bản ghi mẫu. Kiểm tra một thay đổi đã xác nhận vẫn còn sau reload/restart; tránh tạo bài chúc/tim thử trên production.
-6. Khôi phục khi cần: dừng ghi/service, giữ bản sao file hiện tại, đưa backup hợp lệ về đúng `STATE_FILE_PATH` trên volume, bảo đảm quyền ghi rồi khởi động lại và đối chiếu. Giữ nguyên volume khi redeploy; xóa volume sẽ xóa dữ liệu.
-
-Không coi khởi động container thành công là bằng chứng dữ liệu đã bền. Cần xác nhận volume thực sự gắn đúng mount path trước lần redeploy có kiểm soát. Mã mời phải được giữ ổn định qua các lần redeploy; chỉ tạo lại khi chủ động xoay khóa/mã và phân phối link mới.
-
-## Ảnh và hướng thiết kế
-
-`MemberAvatar` dùng 11 ảnh WebP có thật trong `public/avatars`, cạnh dài tối đa 384px; hai thành viên chưa có ảnh dùng chữ viết tắt trực tiếp, không request file thiếu. Giữ ảnh gốc để chỉnh crop khi cần; chỉ sử dụng/chia sẻ ảnh với sự đồng ý phù hợp. Không tạo chân dung giả.
-
-Xem `DESIGN.md` để giữ nhất quán màu, cỡ chữ, layout, nội dung trung thực và quyền lựa chọn. Không thêm dữ liệu mẫu, tim tự cộng, khách mặc định hoặc số thiết bị suy diễn để làm màn hình có vẻ đông vui.
-
-Khi nhập từng biến trong Railway, giá trị `EVENT_MEMBER_CODES_JSON` là đối tượng JSON nguyên văn, không gồm dấu nháy đơn bên ngoài dùng bởi shell trong tệp `.env`. Có thể nhập toàn bộ tệp bằng Raw Editor hỗ trợ cú pháp dotenv; sau khi lưu hãy kiểm tra biến JSON được parse đúng bằng đăng nhập mã mời (không hiển thị secret trong log).
-
-Kiểm thử backend (storage, phiên, quyền, RSVP và game) chạy trên thư mục tạm tự xóa: `node scripts/backend-test.cjs`, hoặc `docker exec ktcnmt-events node scripts/backend-test.cjs` khi dùng dependency trong container. Không trỏ bài kiểm thử vào volume thật.
+`MemberAvatar` dùng 11 ảnh WebP thật, hai người chưa có ảnh dùng initials không request ảnh thiếu. Giữ đúng crop và tỷ lệ logo ACV; không tạo chân dung giả. Be Vietnam Pro regular/semibold được tự lưu kèm giấy phép OFL trong `public/fonts` để chữ Việt nhất quán, không phụ thuộc font serif trên thiết bị. Xem `DESIGN.md` và `UX-CONTRACT.md` cho token và hợp đồng tương tác.
