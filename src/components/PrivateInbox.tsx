@@ -374,12 +374,13 @@ export default function PrivateInbox({
               ))
             )}
           </div>
-          <form className="message-compose" onSubmit={send}>
+          <form className="message-compose" onSubmit={send} noValidate>
             <label htmlFor="private-message">
               Lời nhắn tới {recipient.shortName}
             </label>
             <textarea
               id="private-message"
+              className="resize-none"
               rows={3}
               maxLength={2000}
               value={draft}

@@ -1593,7 +1593,6 @@ h1 {
 .message-compose textarea {
   width: 100%;
   min-height: 90px;
-  resize: vertical;
 }
 .message-compose .section-row {
   flex-direction: row;
