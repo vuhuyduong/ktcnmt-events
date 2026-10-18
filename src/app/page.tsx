@@ -661,7 +661,7 @@ export default function EventApp() {
             {tab === "personal"
               ? user
                 ? `Chào ${user.shortName}`
-                : "Tháng Mười, có bạn thật vui."
+                : "Tháng Mười của những cô gái xinh đẹp"
               : tab === "wall"
                 ? "Những lời chúc gửi trao"
                 : tab === "messages"
