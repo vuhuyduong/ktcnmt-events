@@ -97,6 +97,7 @@ export interface AppStateData {
   avatars?: Record<string, { data: string; version: string }>;
   privateMessages: PrivateMessage[];
   memoryRuns: Record<string, MemoryRun>;
+  practiceMemoryRuns?: Record<string, MemoryRun>;
   memoryScores: Record<string, MemoryBests>;
 }
 
@@ -353,8 +354,9 @@ function readStateFromDisk(): AppStateData {
         (m.readAt !== undefined && typeof m.readAt !== "string"),
     ) ||
     !record(parsed.memoryRuns) ||
+    (parsed.practiceMemoryRuns !== undefined && !record(parsed.practiceMemoryRuns)) ||
     !record(parsed.memoryScores) ||
-    Object.entries(parsed.memoryRuns).some(
+    [...Object.entries(parsed.memoryRuns), ...Object.entries(parsed.practiceMemoryRuns || {})].some(
       ([id, run]) =>
         !validMemberId(id) ||
         !record(run) ||

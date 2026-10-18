@@ -44,3 +44,7 @@ Trang riêng thêm nút đổi ảnh, mở hộp thoại xem trước hình trò
 Dấu tick xanh trên avatar thể hiện xác nhận tham dự thật, có nhãn cho trình đọc màn hình và chú giải ở danh sách chọn người. Chỉ trạng thái `attending` rõ ràng được tính; người chưa xác nhận, còn thu xếp hoặc không đi không có tick.
 
 Trong tab Trò chơi, Huy Dương có chế độ chơi thử riêng, phân biệt rõ với trò chơi chung. Bàn thử dùng thành viên mẫu, được lưu riêng và có thể bắt đầu/đặt lại bất cứ lúc nào. Không sửa danh sách tham dự hoặc kết quả chung khi thử.
+
+Trong danh sách hậu cần “Mọi người đã hẹn thế nào?”, mỗi dòng có nhãn trạng thái chữ rõ ràng. Người đã xác nhận đi có tick xanh và nền xanh nhẹ; đang thu xếp, không tham dự, chưa xác nhận và dữ liệu cũ cần xác nhận lại có nhãn riêng. Không chỉ dựa vào màu.
+
+Chơi thử Admin có hai thẻ chọn trò: Lật thẻ tìm đôi và Mở hộp quà. Chuyển trò giữ ván hiện tại. Cả hai dùng dữ liệu thử riêng; thành tích lật thẻ thử không lên bảng xếp hạng thật.

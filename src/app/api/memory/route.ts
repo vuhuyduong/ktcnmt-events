@@ -7,6 +7,7 @@ import {
   apiError,
   getSession,
   noStore,
+  requireAdmin,
   requestBody,
   requireSession,
 } from "@/lib/auth";
@@ -14,8 +15,8 @@ import { compareFlips, compareTime, type MemoryView } from "@/lib/social";
 
 export const dynamic = "force-dynamic";
 
-function view(state: AppStateData, memberId?: string): MemoryView {
-  const run = memberId ? state.memoryRuns[memberId] : null;
+function view(state: AppStateData, memberId?: string, practice = false): MemoryView {
+  const run = memberId ? (practice ? state.practiceMemoryRuns : state.memoryRuns)?.[memberId] : null;
   const { deck, ...visible } = run || { deck: [] };
   const open = run?.hideAt && Date.now() >= run.hideAt ? [] : run?.open || [];
   return {
@@ -29,10 +30,10 @@ function view(state: AppStateData, memberId?: string): MemoryView {
         } as NonNullable<MemoryView["run"]>)
       : null,
     leaderboards: {
-      byFlips: Object.values(state.memoryScores)
+      byFlips: practice ? [] : Object.values(state.memoryScores)
         .map((s) => s.byFlips)
         .sort(compareFlips),
-      byTime: Object.values(state.memoryScores)
+      byTime: practice ? [] : Object.values(state.memoryScores)
         .map((s) => s.byTime)
         .sort(compareTime),
     },
@@ -42,13 +43,15 @@ function view(state: AppStateData, memberId?: string): MemoryView {
 
 export async function GET(req: NextRequest) {
   try {
-    const session = getSession(req);
+    const practice = req.nextUrl.searchParams.get("practice") === "1";
+    const session = practice ? requireSession(req) : getSession(req);
+    if (practice) requireAdmin(session!);
     if (req.nextUrl.searchParams.has("memberId"))
       assertSessionIdentity(
         session,
         req.nextUrl.searchParams.get("memberId") || null,
       );
-    return NextResponse.json(view(getState(), session?.memberId), {
+    return NextResponse.json(view(getState(), session?.memberId, practice), {
       headers: noStore,
     });
   } catch (error) {
@@ -59,19 +62,22 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const session = requireSession(req);
+    const practice = req.nextUrl.searchParams.get("practice") === "1";
+    if (practice) requireAdmin(session);
     const body = await requestBody(req);
     assertSessionIdentity(session, body.memberId);
     if (!["START", "FLIP"].includes(String(body.action)))
       throw new ApiError(400, "Thao tác không hợp lệ.");
     const now = Date.now();
     const updated = updateState((draft) => {
+      const runs = practice ? (draft.practiceMemoryRuns ||= {}) : draft.memoryRuns;
       if (body.action === "START") {
         const deck = Array.from({ length: 12 }, (_, i) => i % 6);
         for (let i = deck.length - 1; i > 0; i--) {
           const j = randomInt(i + 1);
           [deck[i], deck[j]] = [deck[j], deck[i]];
         }
-        draft.memoryRuns[session.memberId] = {
+        runs[session.memberId] = {
           id: randomUUID(),
           deck,
           open: [],
@@ -83,7 +89,7 @@ export async function POST(req: NextRequest) {
         };
         return;
       }
-      const run = draft.memoryRuns[session.memberId];
+      const run = runs[session.memberId];
       if (!run || run.id !== body.runId || run.finishedAt)
         throw new ApiError(
           409,
@@ -118,6 +124,7 @@ export async function POST(req: NextRequest) {
       }
       if (run.matched.length === 6) {
         run.finishedAt = now;
+        if (practice) return;
         const score = {
           memberId: session.memberId,
           flips: run.flips,
@@ -137,7 +144,7 @@ export async function POST(req: NextRequest) {
         };
       }
     });
-    return NextResponse.json(view(updated, session.memberId), {
+    return NextResponse.json(view(updated, session.memberId, practice), {
       headers: noStore,
     });
   } catch (error) {

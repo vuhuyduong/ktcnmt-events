@@ -187,6 +187,31 @@ async function main() {
     new NextRequest(`http://localhost${url}`, {
       headers: cookie ? { cookie } : {},
     });
+  // Both rehearsal games are admin-only and must leave competitive memory scores/runs alone.
+  assert.equal((await memory.GET(get("/api/memory?practice=1", nhu))).status, 403);
+  assert.equal((await memory.POST(req("/api/memory?practice=1", { action: "START" }, nhu))).status, 403);
+  const realMemoryRuns = store.getState().memoryRuns;
+  const realMemoryScores = store.getState().memoryScores;
+  const trialStart = await memory.POST(req("/api/memory?practice=1", { action: "START", memberId: "huy-duong" }, admin));
+  assert.equal(trialStart.status, 200);
+  const trial = await trialStart.json();
+  assert.ok(trial.run.cards.every(card => card.pair === null), "trial cards stay secret");
+  const trialDeck = store.getState().practiceMemoryRuns["huy-duong"].deck;
+  for (let pair = 0; pair < 6; pair++) {
+    const indexes = trialDeck.flatMap((value, index) => value === pair ? [index] : []);
+    for (const index of indexes) {
+      const flipped = await memory.POST(req("/api/memory?practice=1", { action: "FLIP", memberId: "huy-duong", runId: trial.run.id, index }, admin));
+      assert.equal(flipped.status, 200);
+    }
+  }
+  const trialFinished = await (await memory.GET(get("/api/memory?practice=1", admin))).json();
+  assert.ok(trialFinished.run.finishedAt, "memory rehearsal can be completed");
+  assert.deepEqual(trialFinished.leaderboards, { byFlips: [], byTime: [] });
+  assert.deepEqual(store.getState().memoryRuns, realMemoryRuns, "trial does not replace a competitive run");
+  assert.deepEqual(store.getState().memoryScores, realMemoryScores, "trial never enters the leaderboard");
+  global.__ktcnmtStateCache = undefined;
+  assert.equal((await (await memory.GET(get("/api/memory?practice=1", admin))).json()).run.id, trial.run.id, "trial survives storage reload");
+
   // Rehearsal must work before RSVPs, remain admin-only, and leave live play intact.
   const liveBeforePractice = store.getState().gameState;
   const practiceStart = await game.POST(req("/api/game?practice=1", { action: "START_LIVE" }, admin));

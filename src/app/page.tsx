@@ -124,7 +124,9 @@ export default function EventApp() {
   const [message, setMessage] = useState("");
   const [gameError, setGameError] = useState("");
   const [gamePending, setGamePending] = useState(false);
+  const [memoryPending, setMemoryPending] = useState(false);
   const [practice, setPractice] = useState(false);
+  const [practiceActivity, setPracticeActivity] = useState<"gifts" | "memory">("gifts");
   const [practiceSnapshot, setPracticeSnapshot] = useState<Partial<Snapshot> | null>(null);
   const [avatarBusy, setAvatarBusy] = useState(false);
   const [resetConfirm, setResetConfirm] = useState(false);
@@ -152,6 +154,7 @@ export default function EventApp() {
   const { rsvps, wishes } = snapshot;
   const game = practice && session.isAdmin ? practiceSnapshot?.gameState || emptySnapshot.gameState : snapshot.gameState;
   const queens = practice && session.isAdmin ? practiceSnapshot?.queens || [] : snapshot.queens;
+  const showMemoryGame = practice ? practiceActivity === "memory" : game.phase === "WAITING";
   const myRsvp = user ? rsvps[user.id] : undefined;
   const currentQueen = queens.find((queen) => queen.id === game.currentQueenId);
   const activeBox = game.boxes.find(
@@ -335,6 +338,7 @@ export default function EventApp() {
     if (
       tab !== "game" ||
       game.phase !== "REVEALED" ||
+      showMemoryGame ||
       window.matchMedia("(prefers-reduced-motion: reduce)").matches
     )
       return;
@@ -348,7 +352,7 @@ export default function EventApp() {
       colors: ["#f2a7b5", "#a7d8c4", "#f8fafc"],
       disableForReducedMotion: true,
     });
-  }, [tab, game.phase, game.activeBoxNumber, game.phaseStartedAt]);
+  }, [tab, game.phase, game.activeBoxNumber, game.phaseStartedAt, showMemoryGame]);
 
   useEffect(() => {
     const dialog = logoutDialog.current;
@@ -554,7 +558,7 @@ export default function EventApp() {
   }
 
   async function togglePractice() {
-    if (gamePending || !session.isAdmin) return;
+    if (gamePending || memoryPending || !session.isAdmin) return;
     setGameError("");
     setResetConfirm(false);
     setPresentation(false);
@@ -566,6 +570,7 @@ export default function EventApp() {
       if (identity !== currentIdentity.current) return;
       ++latestRequest.current;
       applyPractice(data);
+      setPracticeActivity("gifts");
       setPractice(true);
     } catch (error) {
       setGameError(error instanceof Error ? error.message : "Chưa mở được chế độ chơi thử.");
@@ -1105,28 +1110,32 @@ export default function EventApp() {
                   <div className="logistics-list">
                     {STAFF_MEMBERS.map((member) => {
                       const rsvp = rsvps[member.id];
+                      const status = rsvp?.attendanceStatus || "unconfirmed";
+                      const isConfirmed = status === "attending";
+                      const statusLabel = isConfirmed ? "Đã xác nhận đi"
+                        : status === "maybe" ? "Đang thu xếp"
+                        : status === "declined" ? "Không tham dự"
+                        : rsvp ? "Cần xác nhận lại" : "Chưa xác nhận";
                       return (
-                        <article key={member.id}>
-                          <strong>{member.fullName}</strong>
-                          <p>
-                            {rsvp
-                              ? rsvp.attendanceStatus
-                                ? attendanceLabels[rsvp.attendanceStatus]
-                                : "Cần xác nhận lại"
-                              : "Chưa trả lời"}
-                            {rsvp?.hasPlusOne
-                              ? ` · Khách: ${rsvp.plusOneName || "1 khách"}`
-                              : ""}
-                          </p>
-                          {rsvp?.attending && (
+                        <article key={member.id} className={`attendance-row ${isConfirmed ? "is-confirmed" : ""}`}>
+                          <div className="logistics-person">
+                            <strong>{member.fullName}</strong>
+                            <span className={`attendance-status status-${status}`}>
+                              {isConfirmed && <Check size={16} aria-hidden="true" />}
+                              {statusLabel}
+                            </span>
+                          </div>
+                          {isConfirmed && rsvp?.hasPlusOne && (
+                            <p>Khách đi cùng: {rsvp.plusOneName || "1 khách"}</p>
+                          )}
+                          {isConfirmed && rsvp && (
                             <p>
                               {member.gender === "female"
                                 ? rsvp.joinSharedRide1715
                                   ? "Đi taxi cùng mọi người"
                                   : "Mình tự di chuyển"
                                 : MALE_TRANSPORT_OPTIONS.find(
-                                    (option) =>
-                                      option.id === rsvp.transportOption,
+                                    (option) => option.id === rsvp.transportOption,
                                   )?.label || "Mình tự di chuyển"}
                             </p>
                           )}
@@ -1211,16 +1220,36 @@ export default function EventApp() {
 
       {tab === "game" && (
         <div className="game-layout">
-          {session.isAdmin && !presentation && <section className="card practice-controls">
-            <div><strong>{practice ? "Bạn đang chơi thử riêng" : "Kiểm tra trước buổi tiệc"}</strong>
-              <p>{practice ? "Có thể thử mọi lượt với danh sách mẫu. Kết quả không tính vào buổi tiệc." : "Chơi thử bất cứ lúc nào, kể cả khi chưa ai xác nhận tham dự."}</p></div>
-            <button type="button" className="quiet-button" disabled={gamePending} onClick={() => void togglePractice()}>
-              {practice ? "Về trò chơi chung" : "Chơi thử riêng (Admin)"}
-            </button>
-          </section>}
+          {session.isAdmin && !presentation && (
+            <section className="card practice-controls">
+              <div className="practice-heading">
+                <div>
+                  <strong>{practice ? "Chọn trò để chơi thử" : "Kiểm tra trước buổi tiệc"}</strong>
+                  <p>{practice ? "Hai trò chơi, mỗi trò giữ ván thử riêng. Bạn có thể chuyển qua lại bất cứ lúc nào." : "Thử lật thẻ tìm đôi hoặc mở hộp quà, kể cả khi chưa ai xác nhận tham dự."}</p>
+                </div>
+                <button type="button" className="quiet-button" disabled={gamePending || memoryPending} onClick={() => void togglePractice()}>
+                  {practice ? "Về trò chơi chung" : "Chơi thử riêng (Admin)"}
+                </button>
+              </div>
+              {practice && (
+                <div className="practice-games" role="group" aria-label="Chọn trò chơi thử">
+                  <button type="button" aria-pressed={practiceActivity === "memory"} disabled={gamePending || memoryPending}
+                    onClick={() => { setPracticeActivity("memory"); setResetConfirm(false); setGameError(""); }}>
+                    <strong>Lật thẻ tìm đôi</strong>
+                    <small>Tìm 6 đôi hình · Không ghi bảng xếp hạng</small>
+                  </button>
+                  <button type="button" aria-pressed={practiceActivity === "gifts"} disabled={gamePending || memoryPending}
+                    onClick={() => { setPracticeActivity("gifts"); setResetConfirm(false); setGameError(""); }}>
+                    <strong>Mở hộp quà</strong>
+                    <small>Nhận thử thách · Chọn người đồng hành</small>
+                  </button>
+                </div>
+              )}
+            </section>
+          )}
           <section className="card game-stage">
             {practice && <p className="feedback" role="status">Chơi thử riêng · Kết quả không tính vào buổi tiệc</p>}
-            {game.phase !== "WAITING" && (
+            {!showMemoryGame && game.phase !== "WAITING" && (
               <>
                 <div className="section-row">
                   <p className="eyebrow">Cùng vui, luôn tự nguyện</p>
@@ -1239,11 +1268,23 @@ export default function EventApp() {
                 </p>
               </>
             )}
-            {game.phase === "WAITING" ? (
+            {showMemoryGame ? (
               <MemoryGame
-                key={user?.id || "guest"}
+                key={`${user?.id || "guest"}-${practice ? "practice" : "normal"}`}
                 memberId={user?.id || null}
+                practice={practice}
+                onPendingChange={setMemoryPending}
               />
+            ) : game.phase === "WAITING" ? (
+              <div className="empty-state">
+                <Gift aria-hidden="true" />
+                <h2>Mở hộp quà bí mật</h2>
+                <p>Thử chọn hộp, khám phá thử thách và chọn người đồng hành. Bàn thử dùng danh sách mẫu và không ảnh hưởng chương trình chung.</p>
+                <button type="button" className="primary-button" disabled={gamePending}
+                  onClick={() => void gameAction({ action: "START_LIVE" })}>
+                  Bắt đầu ván thử
+                </button>
+              </div>
             ) : game.phase === "COMPLETED" ? (
               <div className="empty-state">
                 <Heart aria-hidden="true" />
@@ -1374,7 +1415,7 @@ export default function EventApp() {
                 {gameError}
               </p>
             )}
-            {game.boxes.some((box) => box.isOpened) && (
+            {!showMemoryGame && game.boxes.some((box) => box.isOpened) && (
               <details className="game-results">
                 <summary>Kết quả đã mở</summary>
                 <div className="logistics-list">
@@ -1406,7 +1447,7 @@ export default function EventApp() {
               </details>
             )}
           </section>
-          {session.isAdmin && !presentation && (
+          {session.isAdmin && !presentation && (!practice || (!showMemoryGame && game.phase !== "WAITING")) && (
             <section className="card host-panel">
               <p className="eyebrow">Huy Dương giữ nhịp buổi vui</p>
               <h2>Điều khiển chương trình</h2>

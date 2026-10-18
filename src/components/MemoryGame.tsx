@@ -14,7 +14,11 @@ const motifs = [
   { symbol: "✦", name: "Ngôi sao" },
 ];
 
-export default function MemoryGame({ memberId }: { memberId: string | null }) {
+export default function MemoryGame({ memberId, practice = false, onPendingChange }: {
+  memberId: string | null;
+  practice?: boolean;
+  onPendingChange?: (pending: boolean) => void;
+}) {
   const [data, setData] = useState<MemoryView | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
@@ -45,7 +49,7 @@ export default function MemoryGame({ memberId }: { memberId: string | null }) {
       const seq = ++version.current;
       try {
         const response = await fetch(
-          `/api/memory?memberId=${encodeURIComponent(memberId || "")}`,
+          `/api/memory?memberId=${encodeURIComponent(memberId || "")}${practice ? "&practice=1" : ""}`,
           {
             cache: "no-store",
             signal: AbortSignal.timeout(12000),
@@ -79,16 +83,17 @@ export default function MemoryGame({ memberId }: { memberId: string | null }) {
       clearInterval(poll);
       clearInterval(tick);
     };
-  }, [memberId]);
+  }, [memberId, practice]);
 
   async function act(action: "START" | "FLIP", index?: number) {
     if (!memberId || busy.current || identityChanged) return;
     busy.current = true;
     ++version.current;
     setPending(true);
+    onPendingChange?.(true);
     setError("");
     try {
-      const response = await fetch("/api/memory", {
+      const response = await fetch(practice ? "/api/memory?practice=1" : "/api/memory", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action, memberId, runId: run?.id, index }),
@@ -112,6 +117,7 @@ export default function MemoryGame({ memberId }: { memberId: string | null }) {
     } finally {
       busy.current = false;
       setPending(false);
+      onPendingChange?.(false);
     }
   }
   const hiding = !!run?.hideAt && now >= run.hideAt;
@@ -188,7 +194,7 @@ export default function MemoryGame({ memberId }: { memberId: string | null }) {
           </div>
           <p className="memory-status" role="status">
             {run.finishedAt
-              ? `Đủ sáu đôi rồi! ${run.flips} lần lật trong ${formatDuration(duration)}. Thành tích đã được lưu ♡`
+              ? `Đủ sáu đôi rồi! ${run.flips} lần lật trong ${formatDuration(duration)}. ${practice ? "Ván thử đã hoàn tất ♡" : "Thành tích đã được lưu ♡"}`
               : run.open.length === 2 && !hiding
                 ? "Chưa thành đôi. Nhớ vị trí rồi mình thử tiếp nhé."
                 : run.open.length === 1
@@ -232,10 +238,11 @@ export default function MemoryGame({ memberId }: { memberId: string | null }) {
         </p>
       )}
       <p className="hint">
-        Đồng hồ bắt đầu từ thẻ đầu tiên. Chỉ ván hoàn tất được xếp hạng; không
-        tính vào lượt mở quà buổi tối.
+        {practice
+          ? "Đồng hồ bắt đầu từ thẻ đầu tiên. Đây là ván thử riêng, không ghi vào bảng xếp hạng."
+          : "Đồng hồ bắt đầu từ thẻ đầu tiên. Chỉ ván hoàn tất được xếp hạng; không tính vào lượt mở quà buổi tối."}
       </p>
-      <section className="leaderboard" aria-label="Bảng xếp hạng lật thẻ">
+      {!practice && <section className="leaderboard" aria-label="Bảng xếp hạng lật thẻ">
         <div className="section-row">
           <h3>Bảng xếp hạng</h3>
           <span aria-hidden="true">♛</span>
@@ -311,7 +318,7 @@ export default function MemoryGame({ memberId }: { memberId: string | null }) {
             })}
           </ol>
         )}
-      </section>
+      </section>}
     </div>
   );
 }
