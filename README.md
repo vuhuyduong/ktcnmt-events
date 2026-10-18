@@ -29,6 +29,12 @@ Tab **Tin riêng** cho gửi/nhận với từng người trong roster, hiển t
 
 Cookie được ký bằng khóa ngẫu nhiên bền ở cạnh file state (`<STATE_FILE_PATH>.session-key`), không cần cấu hình thêm. Cookie tên người thuần từ bản cũ không còn hợp lệ: người dùng chọn lại ảnh một lần. Sao lưu cả khóa nếu muốn giữ các phiên sau khôi phục. Chữ ký ngăn sửa cookie để giả danh, nhưng chọn ảnh vẫn không xác minh danh tính: triple click chỉ giảm đổi nhầm, không chặn một người chọn người khác từ trình duyệt mới. Không nên dùng hộp thư này cho thông tin nhạy cảm nếu chưa bổ sung xác thực riêng.
 
+Mỗi người có thể bấm **Đổi ảnh đại diện** trong trang riêng, chọn ảnh JPG/PNG/WebP tối đa 5 MB, xem trước và bấm **Dùng ảnh này**. Server kiểm tra ảnh thật, xoay theo EXIF, cắt vuông 384×384 và bỏ metadata. Ảnh thay thế lưu cùng file state trên volume bền; mọi avatar (danh sách, lời chúc, hộp thư, bảng xếp hạng) dùng phiên bản mới. Chỉ phiên của chính người đó được đổi ảnh; tab có danh tính cũ bị từ chối. Ảnh mặc định trong `public/avatars` vẫn được giữ.
+
+Avatar có dấu tick xanh khi thành viên đã lưu `attendanceStatus: attending`. Danh sách mã thành viên đã xác nhận được công khai để nhận biết nhanh; thông tin di chuyển, người đi cùng và ghi chú vẫn theo quyền xem hiện có. Chọn “cần thu xếp” hoặc “không đến” sẽ bỏ dấu tick; bản ghi cũ chưa xác nhận rõ ràng không có tick.
+
+Huy Dương có nút **Chơi thử riêng (Admin)** trong tab Trò chơi, dùng được bất cứ lúc nào. Bấm **Bắt đầu ván thử** để thử mở hộp, chọn người đồng hành và chuyển lượt với danh sách thành viên mẫu, không cần RSVP. Bàn thử lưu riêng, không phát thông báo mở tiệc, không ghi xác nhận tham dự hay thay kết quả ván chung. Có thể đặt lại bàn thử rồi thử tiếp, hoặc bấm **Về trò chơi chung** để quay lại chương trình thật.
+
 Khi host bắt đầu buổi vui, trò mở quà chung xuất hiện với danh sách tham dự được chốt tại thời điểm bắt đầu. Xác nhận tham dự chưa có nghĩa là đã có mặt: host cần đối chiếu thực tế và quà trước khi mở. Các thao tác vẫn kiểm tra lượt và phiên bản trạng thái, giữ kết quả chưa mở ở server. Mọi vai trò và thử thách tự nguyện, có thể đổi hoặc bỏ qua.
 
 Các trường đặt món đã ngừng hiển thị và ngừng nhận qua API. Dữ liệu lịch sử vẫn được giữ trên disk; lưu lựa chọn đi lại không xóa đơn cũ hay ghi chú cũ. Các bản ghi đó không xuất hiện trong payload đơn hoặc công bố trên tường. RSVP cũ thiếu trạng thái rõ ràng được giữ để chính người đó xem và xác nhận lại, chưa được tính vào game.

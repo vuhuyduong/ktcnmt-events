@@ -36,3 +36,11 @@ Chọn ảnh là nhận diện tiện dụng cho nhóm quen biết, không phả
 Đếm ngược số hiện đại đặt ngay dưới header, nền burgundy đậm, số monospace vàng nhạt, ngày/giờ/phút/giây rõ ràng. Mốc 19:00 ngày 20/10/2026 giờ Việt Nam tách biệt với lịch tiệc 19/10 đã xác nhận. Mobile xếp lời dẫn trên dãy số, không tràn ở 320px.
 
 Profile nữ được chào bằng hoa rơi nhẹ trong bốn giây; không nhận pointer events, không lặp khi đổi tab và tôn trọng reduced-motion. Điều hướng bốn tab thêm Tin riêng với số chưa đọc. Hộp thư desktop dùng danh sách hội thoại và nội dung; mobile dùng native select để chọn người nhận. Nội dung tin riêng không vào tường lời chúc hoặc payload công khai; host cũng chỉ thấy hội thoại của chính mình.
+
+## Bổ sung ngày 18/10/2026
+
+Trang riêng thêm nút đổi ảnh, mở hộp thoại xem trước hình tròn và xác nhận dùng ảnh. Dùng ảnh người dùng chọn, không dựng chân dung. Ảnh thay thế đã chuẩn hóa lưu bền trong state, nhận diện bằng phiên bản và dùng nhất quán ở mọi `MemberAvatar`.
+
+Dấu tick xanh trên avatar thể hiện xác nhận tham dự thật, có nhãn cho trình đọc màn hình và chú giải ở danh sách chọn người. Chỉ trạng thái `attending` rõ ràng được tính; người chưa xác nhận, còn thu xếp hoặc không đi không có tick.
+
+Trong tab Trò chơi, Huy Dương có chế độ chơi thử riêng, phân biệt rõ với trò chơi chung. Bàn thử dùng thành viên mẫu, được lưu riêng và có thể bắt đầu/đặt lại bất cứ lúc nào. Không sửa danh sách tham dự hoặc kết quả chung khi thử.

@@ -93,6 +93,8 @@ export interface AppStateData {
   milkTeaOrders: Record<string, MilkTeaOrder>;
   wishes: WishItem[];
   gameState: GameState;
+  practiceGameState?: GameState;
+  avatars?: Record<string, { data: string; version: string }>;
   privateMessages: PrivateMessage[];
   memoryRuns: Record<string, MemoryRun>;
   memoryScores: Record<string, MemoryBests>;
@@ -192,6 +194,27 @@ export function createDefaultState(): AppStateData {
     memoryScores: {},
     gameState: createDefaultGameState(),
   };
+}
+
+// A separate board with roster stand-ins; never save these as real RSVPs.
+export function createPracticeState(state: AppStateData): AppStateData {
+  return {
+    ...state,
+    gameState: state.practiceGameState || createDefaultGameState(),
+    rsvps: Object.fromEntries(STAFF_MEMBERS.map(member => [member.id, {
+      memberId: member.id, attending: true, attendanceStatus: "attending" as const,
+      gameCompanion: true, updatedAt: "",
+    }])),
+  };
+}
+
+function syncAllGameTimers(state: AppStateData): boolean {
+  const liveChanged = syncGameTimers(state);
+  if (!state.practiceGameState) return liveChanged;
+  const practice = createPracticeState(state);
+  const practiceChanged = syncGameTimers(practice);
+  state.practiceGameState = practice.gameState;
+  return liveChanged || practiceChanged;
 }
 
 export function getQueenDisplayName(
@@ -413,40 +436,32 @@ function readStateFromDisk(): AppStateData {
             (id) => typeof id !== "string" || !validMemberId(id),
           ))),
   );
-  const game = parsed.gameState;
-  const invalidBox = game.boxes.some(
-    (value) =>
-      !record(value) ||
-      !Number.isInteger(value.boxNumber) ||
-      Number(value.boxNumber) < 1 ||
-      !strings(value, ["rewardId"]) ||
-      !BLIND_BOX_REWARDS.some((reward) => reward.id === value.rewardId) ||
-      typeof value.isOpened !== "boolean",
+  const invalidAvatars = parsed.avatars !== undefined && (
+    !record(parsed.avatars) || Object.entries(parsed.avatars).some(([id, value]) =>
+      !validMemberId(id) || !record(value) || !strings(value, ["data", "version"]) ||
+      value.data.length > 1024 * 1024 || !/^[A-Za-z0-9+/]+={0,2}$/.test(value.data) ||
+      !/^[a-f0-9-]{36}$/.test(value.version)
+    )
   );
-  const invalidParticipants =
-    game.participants !== undefined &&
-    (!Array.isArray(game.participants) ||
-      game.participants.some(
-        (value) =>
-          !record(value) ||
-          !strings(value, ["id", "shortName", "fullName"]) ||
-          typeof value.isGuest !== "boolean",
-      ));
-  if (
-    invalidRsvp ||
-    invalidSocial ||
-    invalidOrder ||
-    invalidWish ||
-    invalidBox ||
-    invalidParticipants ||
-    typeof game.isLive !== "boolean" ||
-    typeof game.currentQueenId !== "string" ||
-    !Number.isFinite(game.phaseStartedAt) ||
-    !Number.isFinite(game.updatedAt)
-  ) {
-    throw new Error(
-      "Invalid persisted state; restore a verified backup before continuing",
+  const invalidGame = (game: GameState) => {
+    if (!record(game) || !Array.isArray(game.boxes)) return true;
+    const invalidBox = game.boxes.some(value =>
+      !record(value) || !Number.isInteger(value.boxNumber) || Number(value.boxNumber) < 1 ||
+      !strings(value, ["rewardId"]) || !BLIND_BOX_REWARDS.some(reward => reward.id === value.rewardId) ||
+      typeof value.isOpened !== "boolean"
     );
+    const invalidParticipants = game.participants !== undefined && (
+      !Array.isArray(game.participants) || game.participants.some(value =>
+        !record(value) || !strings(value, ["id", "shortName", "fullName"]) || typeof value.isGuest !== "boolean"
+      )
+    );
+    return invalidBox || invalidParticipants || typeof game.isLive !== "boolean" ||
+      !["WAITING", "SELECTING_BOX", "SHAKING", "REVEALED", "SPINNING_MALE", "MALE_SELECTED", "COMPLETED"].includes(game.phase) ||
+      typeof game.currentQueenId !== "string" || !Number.isFinite(game.phaseStartedAt) || !Number.isFinite(game.updatedAt);
+  };
+  if (invalidRsvp || invalidSocial || invalidOrder || invalidWish || invalidAvatars ||
+    invalidGame(parsed.gameState) || (parsed.practiceGameState !== undefined && invalidGame(parsed.practiceGameState))) {
+    throw new Error("Invalid persisted state; restore a verified backup before continuing");
   }
   if (parsed.wishes.some((w) => w.id.startsWith("wish-seed-"))) {
     // Preserve the exact source before the narrowly scoped, known-seed migration.
@@ -464,7 +479,7 @@ function readStateFromDisk(): AppStateData {
 export function getState(): AppStateData {
   const current = globalThis.__ktcnmtStateCache || readStateFromDisk();
   const draft = structuredClone(current);
-  if (syncGameTimers(draft)) {
+  if (syncAllGameTimers(draft)) {
     persistStateToDisk(draft);
     globalThis.__ktcnmtStateCache = draft;
   } else {
@@ -479,7 +494,7 @@ export function updateState(
 ): AppStateData {
   const draft = getState();
   mutator(draft);
-  syncGameTimers(draft);
+  syncAllGameTimers(draft);
   persistStateToDisk(draft);
   globalThis.__ktcnmtStateCache = draft;
   return structuredClone(draft);

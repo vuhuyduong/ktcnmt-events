@@ -160,6 +160,14 @@ export function publicGame(game: GameState, isAdmin = false): GameState {
     }),
   };
 }
+export function memberDisplayPayload(state: AppStateData) {
+  return {
+    confirmedMemberIds: STAFF_MEMBERS.filter(member =>
+      state.rsvps[member.id]?.attendanceStatus === "attending"
+    ).map(member => member.id),
+    avatarVersions: Object.fromEntries(Object.entries(state.avatars || {}).map(([id, avatar]) => [id, avatar.version])),
+  };
+}
 export function statePayload(state: AppStateData, session: Session | null) {
   return {
     rsvps: session?.isAdmin
@@ -167,6 +175,7 @@ export function statePayload(state: AppStateData, session: Session | null) {
       : session && state.rsvps[session.memberId]
         ? { [session.memberId]: state.rsvps[session.memberId] }
         : {},
+    ...memberDisplayPayload(state),
     wishes: state.wishes.map(
       ({
         likedBy,

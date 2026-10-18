@@ -144,6 +144,42 @@ async function main() {
   const nhu = await login("quynh-nhu");
   const anh = await login("ngoc-anh");
   const admin = await login("huy-duong");
+  // Avatar uploads are real images, scoped to the selected identity and persistent.
+  const avatar = require("../src/app/api/avatar/route.ts");
+  const sharp = require("sharp");
+  const photo = await sharp({ create: { width: 800, height: 600, channels: 3, background: "#cc8899" } }).withMetadata({ exif: { IFD0: { Artist: "Test photographer" } } }).png().toBuffer();
+  assert.ok((await sharp(photo).metadata()).exif, "fixture carries metadata to strip");
+  const upload = (cookie, expectedId = "quynh-nhu", bytes = photo) => new NextRequest("http://localhost/api/avatar", {
+    method: "POST", headers: { "content-type": "image/png", "x-member-id": expectedId, ...(cookie ? { cookie } : {}) }, body: bytes,
+  });
+  assert.equal((await avatar.POST(upload())).status, 401);
+  assert.equal((await avatar.POST(upload(nhu, "ngoc-anh"))).status, 409, "stale identity cannot replace another avatar");
+  assert.equal((await avatar.POST(upload(nhu, "quynh-nhu", Buffer.from("not an image")))).status, 400);
+  assert.equal((await avatar.POST(upload(nhu, "quynh-nhu", Buffer.alloc(5 * 1024 * 1024 + 1)))).status, 413);
+  const savedPhoto = await avatar.POST(upload(nhu));
+  assert.equal(savedPhoto.status, 200);
+  const avatarVersion = (await savedPhoto.json()).avatarVersions["quynh-nhu"];
+  assert.ok(avatarVersion);
+  const avatarGet = id => new NextRequest(`http://localhost/api/avatar?memberId=${id}`);
+  const imageResponse = await avatar.GET(avatarGet("quynh-nhu"));
+  assert.equal(imageResponse.status, 200);
+  assert.equal(imageResponse.headers.get("content-type"), "image/webp");
+  const imageMeta = await sharp(Buffer.from(await imageResponse.arrayBuffer())).metadata();
+  assert.equal(imageMeta.width, 384);
+  assert.equal(imageMeta.height, 384);
+  assert.equal(imageMeta.exif, undefined, "personal metadata is stripped");
+  assert.equal((await avatar.GET(avatarGet("ngoc-anh"))).status, 404);
+  assert.equal((await avatar.GET(avatarGet("unknown"))).status, 404);
+  const secondPhoto = await avatar.POST(upload(nhu));
+  assert.equal(secondPhoto.status, 200);
+  const nextAvatarVersion = (await secondPhoto.json()).avatarVersions["quynh-nhu"];
+  assert.notEqual(nextAvatarVersion, avatarVersion, "replacing an avatar changes its public cache key");
+  global.__ktcnmtStateCache = undefined;
+  assert.equal(store.getState().avatars["quynh-nhu"].version, nextAvatarVersion, "avatar survives storage reload");
+  const publicAvatar = await (await api.GET(new NextRequest("http://localhost/api/state"))).json();
+  assert.equal(publicAvatar.avatarVersions["quynh-nhu"], nextAvatarVersion);
+  assert.equal(publicAvatar.avatars, undefined, "image blobs do not bloat shared state payloads");
+
   // Private inbox and competitive memory game: always use isolated storage.
   const messages = require("../src/app/api/messages/route.ts");
   const memory = require("../src/app/api/memory/route.ts");
@@ -151,6 +187,42 @@ async function main() {
     new NextRequest(`http://localhost${url}`, {
       headers: cookie ? { cookie } : {},
     });
+  // Rehearsal must work before RSVPs, remain admin-only, and leave live play intact.
+  const liveBeforePractice = store.getState().gameState;
+  const practiceStart = await game.POST(req("/api/game?practice=1", { action: "START_LIVE" }, admin));
+  assert.equal(practiceStart.status, 200, "admin can rehearse without confirmations");
+  let practice = await practiceStart.json();
+  assert.equal(practice.gameState.phase, "SELECTING_BOX");
+  assert.ok(practice.gameState.boxes.length > 0);
+  assert.equal(practice.rsvps, undefined, "rehearsal stand-ins never appear as real confirmations");
+  assert.deepEqual(practice.confirmedMemberIds, [], "rehearsal display metadata uses real attendance, not stand-ins");
+  assert.equal(practice.avatarVersions["quynh-nhu"], nextAvatarVersion, "rehearsal keeps real avatar versions synchronized");
+  const practiceAction = async (action, extra = {}) => {
+    const result = await game.POST(req("/api/game?practice=1", {
+      action, ...extra, expectedQueenId: practice.gameState.currentQueenId,
+      expectedUpdatedAt: practice.gameState.updatedAt,
+    }, admin));
+    assert.equal(result.status, 200, `practice ${action}`);
+    practice = await result.json();
+  };
+  await practiceAction("OPEN_BOX", { boxNumber: 1 });
+  assert.equal(practice.gameState.phase, "SHAKING");
+  store.updateState(s => { s.practiceGameState.phaseStartedAt = Date.now() - 3000; });
+  practice = await (await game.GET(get("/api/game?practice=1", admin))).json();
+  assert.equal(practice.gameState.phase, "REVEALED");
+  await practiceAction("SPIN_MALE");
+  store.updateState(s => { s.practiceGameState.phaseStartedAt = Date.now() - 3000; });
+  practice = await (await game.GET(get("/api/game?practice=1", admin))).json();
+  assert.equal(practice.gameState.phase, "MALE_SELECTED");
+  await practiceAction("BACK_TO_BOARD");
+  await practiceAction("RESET_GAME");
+  await practiceAction("START_LIVE");
+  assert.deepEqual(store.getState().gameState, liveBeforePractice, "rehearsal never mutates live game");
+  assert.deepEqual(store.getState().rsvps, {}, "rehearsal never invents confirmations");
+  assert.equal((await game.GET(get("/api/game?practice=1", nhu))).status, 403);
+  assert.equal((await game.POST(req("/api/game?practice=1", { action: "START_LIVE" }, nhu))).status, 403);
+  assert.equal((await (await api.GET(get("/api/state"))).json()).practiceGameState, undefined);
+
   assert.equal((await messages.GET(get("/api/messages"))).status, 401);
   assert.equal(
     (await messages.GET(get("/api/messages", "ktcnmt_member=quynh-nhu")))
@@ -585,6 +657,9 @@ async function main() {
     )
   ).json();
   assert.deepEqual(otherState.rsvps, {});
+  const withLegacy = store.getState();
+  withLegacy.rsvps["ngoc-anh"] = { memberId: "ngoc-anh", attending: true, updatedAt: "" };
+  assert.ok(!require("../src/lib/auth.ts").statePayload(withLegacy, null).confirmedMemberIds.includes("ngoc-anh"));
   const historicOrder = {
     memberId: "quynh-nhu",
     drinkName: "Historical choice",
@@ -630,6 +705,11 @@ async function main() {
     await api.GET(new NextRequest("http://localhost/api/state"))
   ).json();
   assert.deepEqual(publicState.rsvps, {});
+  assert.ok(publicState.confirmedMemberIds.includes("quynh-nhu"), "confirmed attendance is publicly distinguishable");
+  assert.ok(!publicState.confirmedMemberIds.includes("ngoc-anh"), "unconfirmed members get no tick");
+  await api.POST(req("/api/state", { ...submit, attendanceStatus: "maybe" }, nhu));
+  assert.ok(!(await (await api.GET(get("/api/state"))).json()).confirmedMemberIds.includes("quynh-nhu"));
+  await api.POST(req("/api/state", submit, nhu));
   assert.equal(
     publicState.milkTeaOrders,
     undefined,
@@ -654,6 +734,17 @@ async function main() {
     (await game.POST(req("/api/game", { action: "START_LIVE" }, admin))).status,
     200,
   );
+  const liveDuringPractice = store.getState().gameState;
+  const attendanceDuringPractice = store.getState().rsvps;
+  await practiceAction("RESET_GAME");
+  await practiceAction("START_LIVE");
+  await practiceAction("SKIP_TURN");
+  assert.deepEqual(store.getState().gameState, liveDuringPractice, "rehearsal works during a live party without changing it");
+  assert.deepEqual(store.getState().rsvps, attendanceDuringPractice);
+  global.__ktcnmtStateCache = undefined;
+  const restoredPractice = await (await game.GET(get("/api/game?practice=1", admin))).json();
+  assert.equal(restoredPractice.gameState.currentQueenId, practice.gameState.currentQueenId, "rehearsal resumes after storage reload");
+
   assert.equal(
     (
       await game.POST(

@@ -15,7 +15,8 @@ import EventCountdown from "@/components/EventCountdown";
 import FlowerWelcome from "@/components/FlowerWelcome";
 import PrivateInbox from "@/components/PrivateInbox";
 import MemoryGame from "@/components/MemoryGame";
-import MemberAvatar from "@/components/MemberAvatar";
+import MemberAvatar, { MemberDisplayContext } from "@/components/MemberAvatar";
+import AvatarEditor from "@/components/AvatarEditor";
 import {
   BLIND_BOX_REWARDS,
   EVENT_INFO,
@@ -37,6 +38,8 @@ type Session = {
   isAdmin: boolean;
 };
 type Snapshot = {
+  confirmedMemberIds: string[];
+  avatarVersions: Record<string, string>;
   rsvps: Record<string, MemberRsvp>;
   wishes: WishItem[];
   queens: QueenParticipant[];
@@ -48,6 +51,8 @@ const attendanceLabels = {
   declined: "Mình không đến được",
 };
 const emptySnapshot: Snapshot = {
+  confirmedMemberIds: [],
+  avatarVersions: {},
   rsvps: {},
   wishes: [],
   queens: [],
@@ -119,6 +124,9 @@ export default function EventApp() {
   const [message, setMessage] = useState("");
   const [gameError, setGameError] = useState("");
   const [gamePending, setGamePending] = useState(false);
+  const [practice, setPractice] = useState(false);
+  const [practiceSnapshot, setPracticeSnapshot] = useState<Partial<Snapshot> | null>(null);
+  const [avatarBusy, setAvatarBusy] = useState(false);
   const [resetConfirm, setResetConfirm] = useState(false);
   const [logoutConfirm, setLogoutConfirm] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -141,7 +149,9 @@ export default function EventApp() {
   const titleRef = useRef<HTMLHeadingElement>(null);
   const confettiKey = useRef("");
   const user = STAFF_MEMBERS.find((member) => member.id === session.memberId);
-  const { gameState: game, rsvps, wishes, queens } = snapshot;
+  const { rsvps, wishes } = snapshot;
+  const game = practice && session.isAdmin ? practiceSnapshot?.gameState || emptySnapshot.gameState : snapshot.gameState;
+  const queens = practice && session.isAdmin ? practiceSnapshot?.queens || [] : snapshot.queens;
   const myRsvp = user ? rsvps[user.id] : undefined;
   const currentQueen = queens.find((queen) => queen.id === game.currentQueenId);
   const activeBox = game.boxes.find(
@@ -163,6 +173,12 @@ export default function EventApp() {
   const apply = useCallback((data: Partial<Snapshot>) => {
     setSnapshot((previous) => ({ ...previous, ...data }));
   }, []);
+  const applyPractice = useCallback((data: Partial<Snapshot>) => {
+    setPracticeSnapshot(data);
+    if (data.avatarVersions && data.confirmedMemberIds) {
+      apply({ avatarVersions: data.avatarVersions, confirmedMemberIds: data.confirmedMemberIds });
+    }
+  }, [apply]);
   const refresh = useCallback(async () => {
     const sequence = ++latestRequest.current;
     const identity = currentIdentity.current;
@@ -236,13 +252,14 @@ export default function EventApp() {
           try {
             const sequence = ++latestRequest.current;
             const identity = currentIdentity.current;
-            const data = await request<Partial<Snapshot>>("/api/game");
+            const data = await request<Partial<Snapshot>>(practice ? "/api/game?practice=1" : "/api/game");
             if (
               !stopped &&
               sequence === latestRequest.current &&
               identity === currentIdentity.current
             ) {
-              apply(data);
+              if (practice) applyPractice(data);
+              else apply(data);
               setConnection("");
             }
           } catch {
@@ -277,7 +294,7 @@ export default function EventApp() {
       window.removeEventListener("online", reconnect);
       window.removeEventListener("offline", reconnect);
     };
-  }, [apply, refresh, tab, game.isLive, connection]);
+  }, [apply, applyPractice, refresh, tab, game.isLive, connection, practice]);
 
   // Initialize only after this roster identity’s server snapshot has loaded.
   // Polls then update the saved summary without overwriting the draft.
@@ -393,7 +410,7 @@ export default function EventApp() {
     }
   }
   async function logout() {
-    if (saving || gamePending || pendingLike || signingOut) return;
+    if (saving || gamePending || avatarBusy || pendingLike || signingOut) return;
     setSigningOut(true);
     setSwitchError("");
     try {
@@ -414,6 +431,8 @@ export default function EventApp() {
         isAdmin: false,
       }));
       setSnapshot(emptySnapshot);
+      setPractice(false);
+      setPracticeSnapshot(null);
       setLoaded(false);
       setLogoutConfirm(false);
       setMessage("");
@@ -511,14 +530,15 @@ export default function EventApp() {
     setMessage("");
     const identity = currentIdentity.current;
     try {
-      const data = await request<Partial<Snapshot>>("/api/game", {
+      const data = await request<Partial<Snapshot>>(practice ? "/api/game?practice=1" : "/api/game", {
         ...payload,
         expectedQueenId: game.currentQueenId,
         expectedUpdatedAt: game.updatedAt,
       });
       if (identity !== currentIdentity.current) return;
       ++latestRequest.current;
-      apply(data);
+      if (practice) applyPractice(data);
+      else apply(data);
       setResetConfirm(false);
       if (payload.action === "RESET_GAME") setMessage("Đã đặt lại trò chơi.");
     } catch (error) {
@@ -531,6 +551,25 @@ export default function EventApp() {
     } finally {
       setGamePending(false);
     }
+  }
+
+  async function togglePractice() {
+    if (gamePending || !session.isAdmin) return;
+    setGameError("");
+    setResetConfirm(false);
+    setPresentation(false);
+    if (practice) { setPractice(false); return; }
+    setGamePending(true);
+    const identity = currentIdentity.current;
+    try {
+      const data = await request<Partial<Snapshot>>("/api/game?practice=1");
+      if (identity !== currentIdentity.current) return;
+      ++latestRequest.current;
+      applyPractice(data);
+      setPractice(true);
+    } catch (error) {
+      setGameError(error instanceof Error ? error.message : "Chưa mở được chế độ chơi thử.");
+    } finally { setGamePending(false); }
   }
 
   const inviteCard = (
@@ -549,6 +588,12 @@ export default function EventApp() {
           highlight
         />
       )}
+      {user && <AvatarEditor key={user.id} memberId={user.id} onBusyChange={setAvatarBusy}
+        disabled={saving || gamePending || !!pendingLike || signingOut}
+        onSaved={avatarVersions => {
+          ++latestRequest.current;
+          apply({ avatarVersions });
+        }} />}
       <h2>
         {user?.gender === "female"
           ? `Gửi ${user.shortName},`
@@ -619,6 +664,7 @@ export default function EventApp() {
   );
 
   return (
+    <MemberDisplayContext.Provider value={{ avatarVersions: snapshot.avatarVersions, confirmedMemberIds: snapshot.confirmedMemberIds }}>
     <main className={`app-shell ${presentation ? "presentation" : ""}`}>
       <a className="skip-link" href="#main-content">
         Đến nội dung chính
@@ -640,7 +686,7 @@ export default function EventApp() {
             type="button"
             className="quiet-button account"
             aria-label={`Profile của ${user.fullName}`}
-            disabled={saving || gamePending || !!pendingLike}
+            disabled={saving || gamePending || avatarBusy || !!pendingLike}
             onClick={accountClick}
           >
             <MemberAvatar
@@ -653,7 +699,7 @@ export default function EventApp() {
         )}
       </header>
       {user?.gender === "female" && (
-        <FlowerWelcome key={user.id} memberId={user.id} />
+        <FlowerWelcome key={`flowers-${user.id}`} memberId={user.id} />
       )}
       {!presentation && <EventCountdown />}
       <div className="page-heading">
@@ -684,7 +730,7 @@ export default function EventApp() {
           {message}
         </p>
       )}
-      {game.isLive && tab !== "game" && (
+      {snapshot.gameState.isLive && tab !== "game" && (
         <div className="game-invitation">
           <Gift aria-hidden="true" />
           <span>Trò chơi đã bắt đầu.</span>
@@ -735,6 +781,7 @@ export default function EventApp() {
               ),
             )}
           </div>
+          <p className="attendance-legend"><Check size={16} aria-hidden="true" /> Dấu tick xanh: đã xác nhận tham dự</p>
           <div className="men-title">
             <span>Anh em nhà mình</span>
             <p>Cùng đến, cùng vui, cùng gửi lời chúc.</p>
@@ -1164,7 +1211,15 @@ export default function EventApp() {
 
       {tab === "game" && (
         <div className="game-layout">
+          {session.isAdmin && !presentation && <section className="card practice-controls">
+            <div><strong>{practice ? "Bạn đang chơi thử riêng" : "Kiểm tra trước buổi tiệc"}</strong>
+              <p>{practice ? "Có thể thử mọi lượt với danh sách mẫu. Kết quả không tính vào buổi tiệc." : "Chơi thử bất cứ lúc nào, kể cả khi chưa ai xác nhận tham dự."}</p></div>
+            <button type="button" className="quiet-button" disabled={gamePending} onClick={() => void togglePractice()}>
+              {practice ? "Về trò chơi chung" : "Chơi thử riêng (Admin)"}
+            </button>
+          </section>}
           <section className="card game-stage">
+            {practice && <p className="feedback" role="status">Chơi thử riêng · Kết quả không tính vào buổi tiệc</p>}
             {game.phase !== "WAITING" && (
               <>
                 <div className="section-row">
@@ -1356,8 +1411,7 @@ export default function EventApp() {
               <p className="eyebrow">Huy Dương giữ nhịp buổi vui</p>
               <h2>Điều khiển chương trình</h2>
               <p className="muted">
-                Kiểm tra người tham dự thực tế và đủ quà trước khi bắt đầu. Chỉ
-                những người đã chọn tham dự mới vào danh sách.
+                {practice ? "Chế độ chơi thử dùng danh sách thành viên để bạn kiểm tra toàn bộ chương trình." : "Kiểm tra người tham dự thực tế và đủ quà trước khi bắt đầu. Chỉ những người đã chọn tham dự mới vào danh sách."}
               </p>
               <button
                 className="primary-button"
@@ -1365,7 +1419,7 @@ export default function EventApp() {
                 disabled={gamePending || game.phase !== "WAITING"}
                 onClick={() => void gameAction({ action: "START_LIVE" })}
               >
-                Bắt đầu trò chơi
+                {practice ? "Bắt đầu ván thử" : "Bắt đầu trò chơi"}
               </button>
               {game.isLive && game.phase !== "COMPLETED" && (
                 <>
@@ -1400,8 +1454,7 @@ export default function EventApp() {
               <details className="danger-zone">
                 <summary>Đặt lại chương trình</summary>
                 <p>
-                  Thao tác này xóa toàn bộ kết quả trò chơi, giữ nguyên lựa chọn
-                  và lời chúc.
+                  {practice ? "Thao tác này chỉ xóa kết quả chơi thử để bạn thử lại." : "Thao tác này xóa toàn bộ kết quả trò chơi, giữ nguyên lựa chọn và lời chúc."}
                 </p>
                 {!resetConfirm ? (
                   <button
@@ -1448,7 +1501,7 @@ export default function EventApp() {
       )}
       {user ? (
         <PrivateInbox
-          key={user.id}
+          key={`inbox-${user.id}`}
           memberId={user.id}
           active={tab === "messages"}
           onUnread={setUnreadMessages}
@@ -1498,7 +1551,7 @@ export default function EventApp() {
         <button
           className="quiet-button"
           type="button"
-          disabled={saving || gamePending || !!pendingLike || signingOut}
+          disabled={saving || gamePending || avatarBusy || !!pendingLike || signingOut}
           onClick={() => void logout()}
         >
           {signingOut ? "Đang đăng xuất…" : "Về danh sách thành viên"}
@@ -1543,5 +1596,6 @@ export default function EventApp() {
         <span>Một chút thương mến, từ anh em trong phòng.</span>
       </footer>
     </main>
+    </MemberDisplayContext.Provider>
   );
 }

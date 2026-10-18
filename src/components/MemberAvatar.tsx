@@ -1,8 +1,13 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useState } from "react";
 import { Check } from "lucide-react";
 import { Gender } from "@/data/roster";
+
+export const MemberDisplayContext = createContext<{
+  avatarVersions: Record<string, string>;
+  confirmedMemberIds: string[];
+}>({ avatarVersions: {}, confirmedMemberIds: [] });
 
 export type AvatarSize = "sm" | "md" | "lg" | "xl" | "2xl";
 
@@ -103,19 +108,22 @@ export const MemberAvatar: React.FC<MemberAvatarProps> = ({
   fullName,
   gender,
   size = "lg",
-  checkedIn = false,
+  checkedIn,
   highlight = false,
   className = "",
 }) => {
+  const { avatarVersions, confirmedMemberIds } = useContext(MemberDisplayContext);
+  const version = avatarVersions[id];
+  const confirmed = checkedIn ?? confirmedMemberIds.includes(id);
   const [imgError, setImgError] = useState(false);
 
   useEffect(() => {
     setImgError(false);
-  }, [id]);
+  }, [id, version]);
 
   const sizeCfg = SIZE_CLASSES[size];
   const initials = getInitials(name, fullName);
-  const portrait = AVATAR_IMAGES[id];
+  const portrait = version ? { width: 384, height: 384 } : AVATAR_IMAGES[id];
   const initialColors =
     gender === "female"
       ? "bg-[#f3dce0] text-[#733947]"
@@ -123,7 +131,7 @@ export const MemberAvatar: React.FC<MemberAvatarProps> = ({
   const ringClass = highlight ? "p-[3px] bg-[#d88b9b]" : "p-[2px] bg-[#d6c8bf]";
 
   const imgFocusClass =
-    AVATAR_FOCUS_CLASSES[id] || "object-cover object-center";
+    (!version && AVATAR_FOCUS_CLASSES[id]) || "object-cover object-center";
 
   return (
     <div
@@ -132,7 +140,7 @@ export const MemberAvatar: React.FC<MemberAvatarProps> = ({
       <div className="relative w-full h-full rounded-full overflow-hidden bg-[#f3e6dc] flex items-center justify-center">
         {portrait && !imgError ? (
           <img
-            src={`/avatars/${id}.webp`}
+            src={version ? `/api/avatar?memberId=${encodeURIComponent(id)}&v=${encodeURIComponent(version)}` : `/avatars/${id}.webp`}
             width={portrait.width}
             height={portrait.height}
             loading="lazy"
@@ -152,9 +160,11 @@ export const MemberAvatar: React.FC<MemberAvatarProps> = ({
         )}
       </div>
 
-      {checkedIn && (
+      {confirmed && (
         <span
           title="Đã xác nhận tham dự"
+          role="img"
+          aria-label="Đã xác nhận tham dự"
           className={`absolute ${sizeCfg.badge} rounded-full bg-[#e3eadd] border-2 border-[#fff8f3] text-[#365b4c] flex items-center justify-center z-10`}
         >
           <Check size={sizeCfg.badgeIcon} strokeWidth={3.5} />

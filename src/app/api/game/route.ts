@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { MALE_MEMBERS } from "@/data/roster";
 import {
   createDefaultGameState,
+  createPracticeState,
+  syncGameTimers,
   createInitialBoxes,
   getDynamicQueens,
   getQueenDisplayName,
@@ -13,6 +15,7 @@ import {
   ApiError,
   apiError,
   getSession,
+  memberDisplayPayload,
   noStore,
   requireAdmin,
   requireSession,
@@ -23,13 +26,19 @@ export const dynamic = "force-dynamic";
 function payload(
   state: ReturnType<typeof getState>,
   session: ReturnType<typeof getSession>,
+  practice = false,
+  realState = state,
 ) {
   const { gameState, queens, rsvps, serverTime } = statePayload(state, session);
-  return { gameState, queens, rsvps, serverTime };
+  return { gameState, queens, serverTime, ...memberDisplayPayload(realState), ...(!practice && { rsvps }) };
 }
 export async function GET(req: NextRequest) {
   try {
-    return NextResponse.json(payload(getState(), getSession(req)), {
+    const practice = req.nextUrl.searchParams.get("practice") === "1";
+    const session = practice ? requireSession(req) : getSession(req);
+    if (practice) requireAdmin(session!);
+    const state = getState();
+    return NextResponse.json(payload(practice ? createPracticeState(state) : state, session, practice, state), {
       headers: noStore,
     });
   } catch (error) {
@@ -39,6 +48,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const session = requireSession(req);
+    const practice = req.nextUrl.searchParams.get("practice") === "1";
+    if (practice) requireAdmin(session);
     const body = await requestBody(req);
     const { action } = body;
     const actions = [
@@ -55,7 +66,8 @@ export async function POST(req: NextRequest) {
     if (!["OPEN_BOX", "SPIN_MALE", "SKIP_TURN"].includes(String(action)))
       requireAdmin(session);
     const now = Date.now();
-    const updated = updateState((draft) => {
+    const updated = updateState((saved) => {
+      const draft = practice ? createPracticeState(saved) : saved;
       const game = draft.gameState;
       const queens = getDynamicQueens(draft);
       const conflict = (
@@ -206,9 +218,13 @@ export async function POST(req: NextRequest) {
       }
       draft.gameState.phaseStartedAt = now;
       draft.gameState.updatedAt = now;
+      if (practice) {
+        syncGameTimers(draft);
+        saved.practiceGameState = draft.gameState;
+      }
     });
     return NextResponse.json(
-      { ok: true, ...payload(updated, session) },
+      { ok: true, ...payload(practice ? createPracticeState(updated) : updated, session, practice, updated) },
       { headers: noStore },
     );
   } catch (error) {

@@ -1746,3 +1746,65 @@ dialog.draft-confirm > p {
     display: none;
   }
 }
+
+.avatar-editor {
+  display: grid;
+  justify-items: start;
+  gap: 0.4rem;
+  margin: 0.75rem 0 1.25rem;
+}
+.avatar-editor small {
+  color: var(--muted);
+  line-height: 1.6;
+  max-width: 32ch;
+}
+.avatar-editor .feedback { margin: 0; }
+.attendance-legend {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  color: var(--green);
+  font-size: 0.85rem;
+  margin: 1.25rem 0;
+}
+.practice-controls {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-color: var(--green);
+}
+.practice-controls strong { color: var(--green); }
+.practice-controls p { margin: 0.4rem 0 0; }
+.practice-controls button { flex-shrink: 0; }
+.avatar-preview-dialog {
+  width: min(26rem, calc(100vw - 2rem));
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  border: 1px solid #e4cec5;
+  border-radius: 1.5rem;
+  padding: 1.5rem;
+  background: var(--panel);
+  color: var(--text);
+}
+.avatar-preview-dialog::backdrop { background: rgb(50 25 35 / 0.5); }
+.avatar-preview {
+  width: 192px;
+  height: 192px;
+  max-width: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  display: block;
+  margin: 1rem auto;
+}
+.avatar-preview-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+@media (max-width: 600px) {
+  .practice-controls { align-items: stretch; flex-direction: column; }
+}
