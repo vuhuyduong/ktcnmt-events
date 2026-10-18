@@ -890,8 +890,27 @@ h1 {
   padding: 4px 0 28px;
 }
 .itinerary h3 {
-  font-size: 1rem;
-  padding: 14px 0 8px;
+  color: var(--pink);
+  font-size: clamp(1.35rem, 3vw, 1.65rem);
+  font-weight: 600;
+  line-height: 1.45;
+  padding: 14px 0 18px;
+}
+.invitation-note {
+  margin-top: 8px;
+  padding: 14px 18px;
+  border-left: 3px solid var(--pink);
+  border-radius: 0 12px 12px 0;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.7;
+}
+.invitation-note strong {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--pink);
+  font-size: 12px;
 }
 .time-marker {
   min-width: 57px;

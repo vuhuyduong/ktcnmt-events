@@ -576,7 +576,7 @@ export default function EventApp() {
         </a>
       )}
       <div className="itinerary">
-        <h3>Buổi hẹn của chúng mình</h3>
+        <h3>Lịch hẹn của chúng ta</h3>
         <div className="event-detail">
           <span className="time-marker">{EVENT_INFO.sharedRide.departure}</span>
           <div>
@@ -611,8 +611,9 @@ export default function EventApp() {
           </div>
         </div>
       </div>
-      <p className="muted">
-        Cứ chọn trang phục mình thấy thoải mái và tự tin nhé.
+      <p className="muted invitation-note" role="note">
+        <strong>Nhắn nhỏ</strong>
+        Hãy xinh đẹp, tự tin và thoải mái để quẩy nhé!
       </p>
     </section>
   );
